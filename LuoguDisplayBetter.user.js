@@ -7,7 +7,7 @@
 // @match        *://www.luogu.com.cn/*
 // @icon         https://fecdn.luogu.com.cn/columba/static.325908fec383795b.logo-single-color.svg
 // @grant        none
-// @run-at       document-start
+// @run-at       document-idle
 // ==/UserScript==
 
 (function() {
@@ -46,6 +46,7 @@
         let css = ``;
         if (cardRounded) {
             css += `.l-card, .lg-article, .card { border-radius: ${cardRadius} !important; }`;
+            css += `.swal2-popup { border-radius: ${cardRadius} !important; }`;
             css += `.l-form-layout, .am-panel { border-radius: ${cardRadius} !important; }`;
             css += `.l-card.comment .author { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }`;
             css += `.dropdown .center { border-radius: ${cardRadius} !important; }`;
@@ -643,5 +644,6 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    window.addEventListener("load", init);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
