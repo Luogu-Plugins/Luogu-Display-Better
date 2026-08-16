@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://www.luogu.com.cn/user/1362278
-// @version      1.1.0
+// @version      1.1.1
 // @description  Change your Luogu style what you like best
 // @author       zsTree & Ashstrider
 // @match        *://www.luogu.com.cn/*
 // @icon         https://fecdn.luogu.com.cn/columba/static.325908fec383795b.logo-single-color.svg
 // @grant        none
-// @run-at       document-start
+// @run-at       document-end
 // ==/UserScript==
 
 (function() {
@@ -46,6 +46,7 @@
         let css = ``;
         if (cardRounded) {
             css += `.l-card, .lg-article, .card { border-radius: ${cardRadius} !important; }`;
+            css += `.swal2-popup { border-radius: ${cardRadius} !important; }`;
             css += `.l-form-layout, .am-panel { border-radius: ${cardRadius} !important; }`;
             css += `.l-card.comment .author { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }`;
             css += `.dropdown .center { border-radius: ${cardRadius} !important; }`;
@@ -643,5 +644,8 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    window.addEventListener("load", init);
+    // 兜底：默认 `document-end` 注入时 readyState 已非 'loading'，通常直接走 else init()；
+    // 仅当用户在脚本管理器中把注入时机手动改为 document-start 时才需要监听 DOMContentLoaded。
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
