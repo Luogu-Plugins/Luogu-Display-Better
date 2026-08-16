@@ -33,4 +33,4 @@ jobs:
             LuoguDisplayBetter.user.js
           prerelease: ${{ steps.version.outputs.patch != '0' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}

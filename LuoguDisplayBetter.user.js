@@ -644,8 +644,6 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    // 兜底：默认 `document-end` 注入时 readyState 已非 'loading'，通常直接走 else init()；
-    // 仅当用户在脚本管理器中把注入时机手动改为 document-start 时才需要监听 DOMContentLoaded。
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 })();
