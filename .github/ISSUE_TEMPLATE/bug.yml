@@ -17,7 +17,7 @@ body:
       required: true
     - label: This bug has not been fixed in the latest version.
       required: true
-    - label: I have searched the [issues](https://github.com/zsTree0830/Luogu-Display-Better/issues) and confirmed that this bug has not been reported.
+    - label: I have searched the [issues](https://github.com/Luogu-Plugins/Luogu-Display-Better/issues) and confirmed that this bug has not been reported.
       required: true
     - label: I am working on fixing this issue.
       required: false

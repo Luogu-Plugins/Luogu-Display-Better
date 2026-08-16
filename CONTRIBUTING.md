@@ -14,4 +14,3 @@ Before you contribute, please read the contribution guidelines.
 - Be patient. We may not be able to review your PR immediately.
 - Please be considerate towards the developers and other users when raising issues or presenting pull requests.
 - Respect our decision(s), and do not be upset or abusive if your submission is not used.
-- For release pull requests, include an HTML comment block starting with `<!-- release-notes` and ending with `-->` in the PR description.
