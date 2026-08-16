@@ -17,7 +17,7 @@ body:
       required: true
     - label: This feature does not yet exist in the latest version.
       required: true
-    - label: I have searched the [issues](https://github.com/zsTree0830/Luogu-Display-Better/issues) and confirmed that this feature has not been requested.
+    - label: I have searched the [issues](https://github.com/Luogu-Plugins/Luogu-Display-Better/issues) and confirmed that this feature has not been requested.
       required: true
     - label: I am working on implementing this feature.
       required: false

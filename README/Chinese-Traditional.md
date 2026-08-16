@@ -1,29 +1,29 @@
-Language: [English](https://github.com/zsTree0830/Luogu-Display-Better#readme) | [简体中文](https://github.com/zsTree0830/Luogu-Display-Better/blob/main/README/Chinese.md) | 繁體中文
+Language: [English](https://github.com/Luogu-Plugins/Luogu-Display-Better#readme) | [简体中文](https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/README/Chinese.md) | 繁體中文
 
 <h1 align="center">Luogu Display Better</h1>
 <p align="center">輕量洛谷美化腳本 · 自由定制你的介面</p>
 
 <p align="center">
-  <a href="https://github.com/zsTree0830/Luogu-Display-Better/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/zsTree0830/Luogu-Display-Better" alt="GitHub license" />
+  <a href="https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/Luogu-Plugins/Luogu-Display-Better" alt="GitHub license" />
   </a>
-  <a href="https://github.com/zsTree0830/Luogu-Display-Better">
-    <img src="https://img.shields.io/github/languages/code-size/zsTree0830/Luogu-Display-Better" alt="GitHub code size" />
+  <a href="https://github.com/Luogu-Plugins/Luogu-Display-Better">
+    <img src="https://img.shields.io/github/languages/code-size/Luogu-Plugins/Luogu-Display-Better" alt="GitHub code size" />
   </a>
-  <a href="https://github.com/zsTree0830/Luogu-Display-Better/issues">
-    <img src="https://img.shields.io/github/issues/zsTree0830/Luogu-Display-Better" alt="GitHub issues" />
+  <a href="https://github.com/Luogu-Plugins/Luogu-Display-Better/issues">
+    <img src="https://img.shields.io/github/issues/Luogu-Plugins/Luogu-Display-Better" alt="GitHub issues" />
   </a>
-  <a href="https://github.com/zsTree0830/Luogu-Display-Better/pulls">
-    <img src="https://img.shields.io/github/issues-pr/zsTree0830/Luogu-Display-Better" alt="GitHub pull requests" />
+  <a href="https://github.com/Luogu-Plugins/Luogu-Display-Better/pulls">
+    <img src="https://img.shields.io/github/issues-pr/Luogu-Plugins/Luogu-Display-Better" alt="GitHub pull requests" />
   </a>
-  <a href="https://github.com/zsTree0830/Luogu-Display-Better/releases/latest">
-    <img src="https://img.shields.io/github/v/release/zsTree0830/Luogu-Display-Better" alt="GitHub release" />
+  <a href="https://github.com/Luogu-Plugins/Luogu-Display-Better/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Luogu-Plugins/Luogu-Display-Better" alt="GitHub release" />
   </a>
-  <a href="https://github.com/zsTree0830/Luogu-Display-Better/stargazers">
-    <img src="https://img.shields.io/github/stars/zsTree0830/Luogu-Display-Better" alt="GitHub stars" />
+  <a href="https://github.com/Luogu-Plugins/Luogu-Display-Better/stargazers">
+    <img src="https://img.shields.io/github/stars/Luogu-Plugins/Luogu-Display-Better" alt="GitHub stars" />
   </a>
-  <a href="https://github.com/zsTree0830/Luogu-Display-Better/forks">
-    <img src="https://img.shields.io/github/forks/zsTree0830/Luogu-Display-Better" alt="GitHub forks" />
+  <a href="https://github.com/Luogu-Plugins/Luogu-Display-Better/forks">
+    <img src="https://img.shields.io/github/forks/Luogu-Plugins/Luogu-Display-Better" alt="GitHub forks" />
   </a>
 </p>
 
@@ -46,7 +46,7 @@ Luogu Display Better 是一款面向 [洛谷](https://www.luogu.com.cn) 的輕�
 ## 安裝指南
 
 1. 安裝支援使用者腳本的瀏覽器擴充功能，例如 Tampermonkey、Violentmonkey 或 Greasemonkey。
-2. 將 [`LuoguDisplayBetter.user.js`](https://github.com/zsTree0830/Luogu-Display-Better/releases/download/latest/LuoguDisplayBetter.user.js) 檔案匯入使用者腳本管理員。
+2. 將 [`LuoguDisplayBetter.user.js`](https://github.com/Luogu-Plugins/Luogu-Display-Better/releases/download/latest/LuoguDisplayBetter.user.js) 檔案匯入使用者腳本管理員。
 3. 開啟或重新整理 [洛谷](https://www.luogu.com.cn)，腳本會自動執行並生效。
 
 ## 使用說明
@@ -64,4 +64,4 @@ Luogu Display Better 是一款面向 [洛谷](https://www.luogu.com.cn) 的輕�
 
 ## 授權條款
 
-本專案採用 GNU General Public License v3.0 授權條款，詳見 [LICENSE](https://github.com/zsTree0830/Luogu-Display-Better/blob/main/LICENSE) 檔案。
+本專案採用 GNU General Public License v3.0 授權條款，詳見 [LICENSE](https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/LICENSE) 檔案。

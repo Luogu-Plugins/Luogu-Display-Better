@@ -2,7 +2,7 @@
 Thank you for contributing to the Luogu Display Better plugin!
 
 Please read the contributors' guide:
-https://github.com/zsTree0830/Luogu-Display-Better/blob/main/CONTRIBUTING.md
+https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/CONTRIBUTING.md
 
 Notes:
 - Base your PR on the development branch (`dev`).
@@ -24,11 +24,11 @@ Notes:
 
 **By submitting this pull request, I confirm the following:**
 
-1. I have read and understood the [contributors' guide](https://github.com/zsTree0830/Luogu-Display-Better/blob/main/CONTRIBUTING.md), as well as this entire template. I understand which branch to base my commits and pull requests on.
+1. I have read and understood the [contributors' guide](https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/CONTRIBUTING.md), as well as this entire template. I understand which branch to base my commits and pull requests on.
 2. I have commented on my proposed changes within the code.
 3. I have tested my changes.
 4. I am willing to help maintain this change if there are issues with it later.
-5. It is compatible with the [GNU General Public License v3.0](https://github.com/zsTree0830/Luogu-Display-Better/blob/main/LICENSE).
+5. It is compatible with the [GNU General Public License v3.0](https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/LICENSE).
 6. I have squashed any insignificant commits. ([`git rebase`](http://gitready.com/advanced/2009/02/10/squashing-commits-with-rebase.html))
 7. I have checked that another pull request for this purpose does not exist.
 8. I have considered and confirmed that this submission will be valuable to others.
