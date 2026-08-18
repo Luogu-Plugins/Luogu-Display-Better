@@ -75,7 +75,7 @@
             `.dropdown .center, .popup { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` +
             `.am-comment-hd, .am-comment-bd { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` +
             `.article-banner { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` +
-            `.top-bar, .sidebar, .nav-group, nav.lfe-body, .user-nav, .header-layout { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` + 
+            `.top-bar, .sidebar, .nav-group, nav.lfe-body, .user-nav, .wrapper.wrapped.lfe-body.header-layout.tiny { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` + 
             `.dropdown, .dropdown .center, .popup,
             .lfe-dropdown, .el-dropdown-menu,
             .el-popper, .dropdown-menu,
