@@ -369,7 +369,7 @@
         applyBgFullscreen();
         applyAdBlock();
         applyCustomCSS();
-        removeDefaultBackground();
+        if (bgFullscreen) removeDefaultBackground();
         updatePanelStyle();
     }
 
