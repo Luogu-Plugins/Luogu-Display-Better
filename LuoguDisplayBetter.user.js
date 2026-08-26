@@ -22,7 +22,9 @@
     let bgFullscreen;
     let adBlock;
     let customCSS;
+
     let bgCleanObserver = null;
+    let isObserving = false;
 
     function initVarible() {
         cardborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-cardborderRad") ?? 15);
@@ -269,22 +271,15 @@
         document.head.appendChild(style);
     }
 
-    function toggleBackgroundCleaner(enable) {
-        if (enable) {
-            if (bgCleanObserver) {
-                bgCleanObserver.disconnect();
-                bgCleanObserver = null;
-            }
+    function cleanBackground() {
+        document.querySelectorAll('.theme-page').forEach(el => {
+            el.classList.remove('theme-frosted');
+            el.removeAttribute('style');
+        });
+    }
 
-            const clean = () => {
-                document.querySelectorAll('.theme-page').forEach(el => {
-                    el.classList.remove('theme-frosted');
-                    el.removeAttribute('style');
-                });
-            };
-
-            clean();
-
+    function ensureObserverCreated() {
+        if (!bgCleanObserver) {
             bgCleanObserver = new MutationObserver((mutations) => {
                 let needClean = false;
                 for (const mutation of mutations) {
@@ -312,29 +307,39 @@
                         }
                     }
                 }
-
                 if (needClean) {
                     bgCleanObserver.disconnect();
-                    clean();
+                    isObserving = false;
+                    cleanBackground();
                     bgCleanObserver.observe(document.documentElement, {
                         childList: true,
                         subtree: true,
                         attributes: true,
                         attributeFilter: ['style', 'class']
                     });
+                    isObserving = true;
                 }
             });
+        }
+    }
 
-            bgCleanObserver.observe(document.documentElement, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['style', 'class']
-            });
+    function toggleBackgroundCleaner(enable) {
+        if (enable) {
+            ensureObserverCreated();
+            cleanBackground();
+            if (!isObserving) {
+                bgCleanObserver.observe(document.documentElement, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['style', 'class']
+                });
+                isObserving = true;
+            }
         } else {
-            if (bgCleanObserver) {
+            if (bgCleanObserver && isObserving) {
                 bgCleanObserver.disconnect();
-                bgCleanObserver = null;
+                isObserving = false;
             }
         }
     }
