@@ -280,18 +280,7 @@
         const clean = () => {
             document.querySelectorAll('.theme-page').forEach(el => {
                 el.classList.remove('theme-frosted');
-
-                const style = el.style;
-                const bgProps = [
-                    'background', 'backgroundImage', 'backgroundColor',
-                    'backgroundPosition', 'backgroundSize', 'backgroundRepeat',
-                    'backgroundAttachment', 'backgroundClip', 'backgroundOrigin'
-                ];
-                bgProps.forEach(prop => {
-                    if (!prop.startsWith('--')) {
-                        style.removeProperty(prop);
-                    }
-                });
+                el.removeAttribute('style');
             });
         };
 
@@ -331,9 +320,7 @@
                 cleaning = true;
                 bgCleanObserver.disconnect();
                 bgCleanObserver.takeRecords();
-
                 clean();
-
                 bgCleanObserver.observe(document.documentElement, {
                     childList: true,
                     subtree: true,
