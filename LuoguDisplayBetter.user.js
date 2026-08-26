@@ -271,10 +271,12 @@
         document.head.appendChild(style);
     }
 
-    function cleanBackground() {
+    function cleanBackground(fullClean) {
         document.querySelectorAll('.theme-page').forEach(el => {
             el.classList.remove('theme-frosted');
-            el.removeAttribute('style');
+            if (fullClean) {
+                el.removeAttribute('style');
+            }
         });
     }
 
@@ -307,10 +309,11 @@
                         }
                     }
                 }
+
                 if (needClean) {
                     bgCleanObserver.disconnect();
                     isObserving = false;
-                    cleanBackground();
+                    cleanBackground(bgFullscreen);
                     bgCleanObserver.observe(document.documentElement, {
                         childList: true,
                         subtree: true,
@@ -324,23 +327,17 @@
     }
 
     function toggleBackgroundCleaner(enable) {
-        if (enable) {
-            ensureObserverCreated();
-            cleanBackground();
-            if (!isObserving) {
-                bgCleanObserver.observe(document.documentElement, {
-                    childList: true,
-                    subtree: true,
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                });
-                isObserving = true;
-            }
-        } else {
-            if (bgCleanObserver && isObserving) {
-                bgCleanObserver.disconnect();
-                isObserving = false;
-            }
+        ensureObserverCreated();
+        cleanBackground(enable);
+
+        if (!isObserving) {
+            bgCleanObserver.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+            isObserving = true;
         }
     }
 
