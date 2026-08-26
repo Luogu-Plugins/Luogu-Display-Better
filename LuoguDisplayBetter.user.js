@@ -23,6 +23,9 @@
     let adBlock;
     let customCSS;
 
+    let cleaning = false;
+    let bgCleanObserver = null;
+
     function initVarible() {
         cardborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-cardborderRad") ?? 15);
         picborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-picborderRad") ?? 8);
@@ -109,8 +112,6 @@
     }
 
     function applyBgFullscreen() {
-        if (window.__ldbCleaning) return;
-
         const oldStyle = document.getElementById('ldb-bgfullscreen-style');
         if (oldStyle) oldStyle.remove();
         document.documentElement.classList.remove('ldb-bgfullscreen');
@@ -271,51 +272,79 @@
     }
 
     function removeDefaultBackground() {
-        if (window.__ldbCleaning) return;
-        window.__ldbCleaning = true;
+        if (bgCleanObserver) {
+            bgCleanObserver.disconnect();
+            bgCleanObserver = null;
+        }
 
         const clean = () => {
             document.querySelectorAll('.theme-page').forEach(el => {
-                el.removeAttribute('style');
                 el.classList.remove('theme-frosted');
+
+                const style = el.style;
+                const bgProps = [
+                    'background', 'backgroundImage', 'backgroundColor',
+                    'backgroundPosition', 'backgroundSize', 'backgroundRepeat',
+                    'backgroundAttachment', 'backgroundClip', 'backgroundOrigin'
+                ];
+                bgProps.forEach(prop => {
+                    if (!prop.startsWith('--')) {
+                        style.removeProperty(prop);
+                    }
+                });
             });
         };
 
         clean();
 
-        setTimeout(() => { window.__ldbCleaning = false; }, 0);
-
-        const observer = new MutationObserver((mutations) => {
-            if (window.__ldbCleaning) return;
+        bgCleanObserver = new MutationObserver((mutations) => {
+            if (cleaning) return;
 
             let needClean = false;
-            for (const m of mutations) {
-                if (m.type === 'childList' && m.addedNodes.length) {
-                    needClean = true;
-                    break;
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList') {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === 1) {
+                            if (node.matches && node.matches('.theme-page')) {
+                                needClean = true;
+                                break;
+                            }
+                            if (node.querySelector && node.querySelector('.theme-page')) {
+                                needClean = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (needClean) break;
                 }
-                if (m.type === 'attributes' && (m.attributeName === 'style' || m.attributeName === 'class')) {
-                    const target = m.target;
-                    if (target.matches && target.matches('.theme-page')) {
+                if (mutation.type === 'attributes') {
+                    const target = mutation.target;
+                    if (target.matches && target.matches('.theme-page') &&
+                        (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
                         needClean = true;
                         break;
                     }
                 }
             }
+
             if (needClean) {
-                observer.disconnect();
-                observer.takeRecords();
-                removeDefaultBackground();
-                observer.observe(document.documentElement, {
+                cleaning = true;
+                bgCleanObserver.disconnect();
+                bgCleanObserver.takeRecords();
+
+                clean();
+
+                bgCleanObserver.observe(document.documentElement, {
                     childList: true,
                     subtree: true,
                     attributes: true,
                     attributeFilter: ['style', 'class']
                 });
+                cleaning = false;
             }
         });
 
-        observer.observe(document.documentElement, {
+        bgCleanObserver.observe(document.documentElement, {
             childList: true,
             subtree: true,
             attributes: true,
