@@ -22,8 +22,6 @@
     let bgFullscreen;
     let adBlock;
     let customCSS;
-
-    let cleaning = false;
     let bgCleanObserver = null;
 
     function initVarible() {
@@ -271,72 +269,74 @@
         document.head.appendChild(style);
     }
 
-    function removeDefaultBackground() {
-        if (bgCleanObserver) {
-            bgCleanObserver.disconnect();
-            bgCleanObserver = null;
-        }
+    function toggleBackgroundCleaner(enable) {
+        if (enable) {
+            if (bgCleanObserver) {
+                bgCleanObserver.disconnect();
+                bgCleanObserver = null;
+            }
 
-        const clean = () => {
-            document.querySelectorAll('.theme-page').forEach(el => {
-                el.classList.remove('theme-frosted');
-                el.removeAttribute('style');
-            });
-        };
+            const clean = () => {
+                document.querySelectorAll('.theme-page').forEach(el => {
+                    el.classList.remove('theme-frosted');
+                    el.removeAttribute('style');
+                });
+            };
 
-        clean();
+            clean();
 
-        bgCleanObserver = new MutationObserver((mutations) => {
-            if (cleaning) return;
-
-            let needClean = false;
-            for (const mutation of mutations) {
-                if (mutation.type === 'childList') {
-                    for (const node of mutation.addedNodes) {
-                        if (node.nodeType === 1) {
-                            if (node.matches && node.matches('.theme-page')) {
-                                needClean = true;
-                                break;
-                            }
-                            if (node.querySelector && node.querySelector('.theme-page')) {
-                                needClean = true;
-                                break;
+            bgCleanObserver = new MutationObserver((mutations) => {
+                let needClean = false;
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList') {
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeType === 1) {
+                                if (node.matches && node.matches('.theme-page')) {
+                                    needClean = true;
+                                    break;
+                                }
+                                if (node.querySelector && node.querySelector('.theme-page')) {
+                                    needClean = true;
+                                    break;
+                                }
                             }
                         }
+                        if (needClean) break;
                     }
-                    if (needClean) break;
-                }
-                if (mutation.type === 'attributes') {
-                    const target = mutation.target;
-                    if (target.matches && target.matches('.theme-page') &&
-                        (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
-                        needClean = true;
-                        break;
+                    if (mutation.type === 'attributes') {
+                        const target = mutation.target;
+                        if (target.matches && target.matches('.theme-page') &&
+                            (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
+                            needClean = true;
+                            break;
+                        }
                     }
                 }
-            }
 
-            if (needClean) {
-                cleaning = true;
+                if (needClean) {
+                    bgCleanObserver.disconnect();
+                    clean();
+                    bgCleanObserver.observe(document.documentElement, {
+                        childList: true,
+                        subtree: true,
+                        attributes: true,
+                        attributeFilter: ['style', 'class']
+                    });
+                }
+            });
+
+            bgCleanObserver.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+        } else {
+            if (bgCleanObserver) {
                 bgCleanObserver.disconnect();
-                bgCleanObserver.takeRecords();
-                clean();
-                bgCleanObserver.observe(document.documentElement, {
-                    childList: true,
-                    subtree: true,
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                });
-                cleaning = false;
+                bgCleanObserver = null;
             }
-        });
-
-        bgCleanObserver.observe(document.documentElement, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['style', 'class']
-        });
+        }
     }
 
     function updatePanelStyle() {
@@ -356,7 +356,7 @@
         applyBgFullscreen();
         applyAdBlock();
         applyCustomCSS();
-        if (bgFullscreen) removeDefaultBackground();
+        toggleBackgroundCleaner(bgFullscreen);
         updatePanelStyle();
     }
 
