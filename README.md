@@ -64,4 +64,4 @@ Luogu Display Better is a lightweight user script for [Luogu](https://www.luogu.
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0. See [LICENSE](https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE](https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/LICENSE) for details.

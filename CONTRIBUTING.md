@@ -1,5 +1,7 @@
 Hi there! Welcome to Luogu Display Better.
 
+This project is licensed under the MIT License. By contributing, you agree that your contributions will be licensed under the same terms.
+
 Before you contribute, please read the contribution guidelines.
 
 > [!IMPORTANT]
@@ -14,3 +16,5 @@ Before you contribute, please read the contribution guidelines.
 - Be patient. We may not be able to review your PR immediately.
 - Please be considerate towards the developers and other users when raising issues or presenting pull requests.
 - Respect our decision(s), and do not be upset or abusive if your submission is not used.
+
+By submitting a pull request, you confirm that you have the right to submit the contribution and that it will be released under the MIT License.
