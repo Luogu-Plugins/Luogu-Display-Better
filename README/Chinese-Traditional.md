@@ -64,4 +64,4 @@ Luogu Display Better 是一款面向 [洛谷](https://www.luogu.com.cn) 的輕�
 
 ## 授權條款
 
-本專案採用 GNU General Public License v3.0 授權條款，詳見 [LICENSE](https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/LICENSE) 檔案。
+本專案採用 MIT 授權條款，詳見 [LICENSE](https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/LICENSE) 檔案。
