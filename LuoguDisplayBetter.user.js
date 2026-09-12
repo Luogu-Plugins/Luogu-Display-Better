@@ -436,7 +436,7 @@
                 </p>
                 <p>
                     <input id="ldb-panel-bgfullscreen" type="checkbox" ${bgFullscreen ? 'checked' : ''} />
-                    <label for="ldb-panel-bgfullscreen">背景全屏（在 <a href="/theme/list" target="_blank">主题</a> 内页首选项卡设置背景图片）</label>
+                    <label for="ldb-panel-bgfullscreen">背景全屏（在 <a href="/theme" target="_blank">主题</a> 内亮色配置选项卡启用中景图片设置背景图片）</label>
                 </p>
                 <p>
                     <input id="ldb-panel-adblock" type="checkbox" ${adBlock ? 'checked' : ''} />
