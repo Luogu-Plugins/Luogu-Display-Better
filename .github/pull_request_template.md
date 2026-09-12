@@ -1,7 +1,13 @@
 <!--
-Thank you for contributing to Luogu Display Better!
+Thank you for contributing to the Luogu Display Better plugin!
 
-Note: Please use this template when submitting a PR, otherwise it may be closed.
+Please read the contributors' guide:
+https://github.com/Luogu-Plugins/Luogu-Display-Better/blob/main/CONTRIBUTING.md
+
+Notes:
+- Base your PR on the development branch (`dev`).
+  External developers should submit pull requests to `extern-contrib`.
+- Please use this pull request template, or your pull request may be closed.
 -->
 
 **What is the purpose of this PR?**
