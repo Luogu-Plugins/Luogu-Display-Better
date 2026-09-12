@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.1.3
+// @version      1.2.0
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
@@ -111,6 +111,21 @@
         document.head.append(style);
     }
 
+    function forceMainTransparent() {
+        const list = document.querySelectorAll('.main-container > main, main');
+        if (!list.length) return;
+        list.forEach(el => {
+            const bgc = el.style.getPropertyValue('background-color').trim();
+            const bg  = el.style.getPropertyValue('background').trim();
+            if (bgc && bgc !== 'transparent' && bgc !== 'rgba(0, 0, 0, 0)') {
+                el.style.setProperty('background-color', 'transparent', 'important');
+            }
+            if (bg && bg !== 'transparent' && bg !== 'none') {
+                el.style.setProperty('background', 'transparent', 'important');
+            }
+        });
+    }
+
     function applyBgFullscreen() {
         const oldStyle = document.getElementById('ldb-bgfullscreen-style');
         if (oldStyle) oldStyle.remove();
@@ -199,8 +214,18 @@
                 background: transparent !important;
                 background-image: none !important;
             }
-            html.ldb-bgfullscreen main.lfe-body {
+            html.ldb-bgfullscreen main,
+            html.ldb-bgfullscreen .main-container > main {
                 background: transparent !important;
+                background-color: transparent !important;
+            }
+            html.ldb-bgfullscreen .main-container,
+            html.ldb-bgfullscreen #app-old,
+            html.ldb-bgfullscreen .lg-index-content,
+            html.ldb-bgfullscreen .lg-index-content .am-g,
+            html.ldb-bgfullscreen .am-panel {
+                background: transparent !important;
+                background-color: transparent !important;
             }
             html.ldb-bgfullscreen .header-layout .background {
                 opacity: 0;
@@ -242,6 +267,8 @@
             }
         `;
         document.head.appendChild(styleEl);
+
+        forceMainTransparent();
 
         if (themePage) {
             const themeVars = ['--theme-body-image', '--theme-body-color', '--theme-body-mid-mask', '--theme-body-color-filter'];
@@ -692,6 +719,16 @@
         appsContainer.appendChild(newLink);
     }
 
+    let mainDomDebounce = null;
+    function scheduleMainDomWork() {
+        if (mainDomDebounce) return;
+        mainDomDebounce = setTimeout(() => {
+            mainDomDebounce = null;
+            addCustomButton();
+            if (bgFullscreen) forceMainTransparent();
+        }, 300);
+    }
+
     function init() {
         const firstUsed = localStorage.getItem("LuoguDisplayBetter-FirstUsed") == null;
         if (firstUsed) {
@@ -712,8 +749,7 @@
         addCustomButton();
         applyAll();
         const observer = new MutationObserver(() => {
-            addCustomButton();
-            if (document.querySelector('.theme-page')) applyAll();
+            scheduleMainDomWork();
         });
         observer.observe(document.body, { childList: true, subtree: true });
     }
