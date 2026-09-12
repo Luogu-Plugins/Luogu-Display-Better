@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Luogu Display Better
-// @namespace    https://www.luogu.com.cn/user/1362278
-// @version      1.1.1
+// @namespace    https://github.com/Luogu-Plugins
+// @version      1.2.0
 // @description  Change your Luogu style what you like best
-// @author       zsTree & Ashstrider
+// @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
 // @icon         https://fecdn.luogu.com.cn/columba/static.325908fec383795b.logo-single-color.svg
 // @grant        none
@@ -22,6 +22,9 @@
     let bgFullscreen;
     let adBlock;
     let customCSS;
+
+    let bgCleanObserver = null;
+    let isObserving = false;
 
     function initVarible() {
         cardborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-cardborderRad") ?? 15);
@@ -45,18 +48,18 @@
         const picRadius = picborderRad + 'px';
         let css = ``;
         if (cardRounded) {
-            css += `.l-card, .lg-article, .card { border-radius: ${cardRadius} !important; }`;
-            css += `.swal2-popup { border-radius: ${cardRadius} !important; }`;
-            css += `.l-form-layout, .am-panel { border-radius: ${cardRadius} !important; }`;
-            css += `.l-card.comment .author { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }`;
-            css += `.dropdown .center { border-radius: ${cardRadius} !important; }`;
-            css += `.user-header-top { border-top-left-radius: ${cardRadius}; border-top-right-radius: ${cardRadius}; } .user-header-bottom { border-bottom-left-radius: ${cardRadius}; border-bottom-right-radius: ${cardRadius}; }`;
-            css += `.user-nav { border-bottom-left-radius: ${cardRadius}; border-bottom-right-radius: ${cardRadius}; }`;
-            css += `.test-case { border-radius: 10px; }`;
-            css += `html.ldb-bgfullscreen .article-banner.article-banner { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }`;
-            css += `html.ldb-bgfullscreen .article-content.article-content { border-bottom-left-radius: ${cardRadius} !important; border-bottom-right-radius: ${cardRadius} !important; }`;
-            css += `html.ldb-bgfullscreen .toc.toc { border-radius: .5em !important; }`;
-            css += `.meta { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }`;
+            css = `.l-card, .lg-article, .card { border-radius: ${cardRadius} !important; }
+                .swal2-popup { border-radius: ${cardRadius} !important; }
+                .l-form-layout, .am-panel { border-radius: ${cardRadius} !important; }
+                .l-card.comment .author { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
+                .dropdown .center { border-radius: ${cardRadius} !important; }
+                .user-header-top { border-top-left-radius: ${cardRadius}; border-top-right-radius: ${cardRadius}; } .user-header-bottom { border-bottom-left-radius: ${cardRadius}; border-bottom-right-radius: ${cardRadius}; }
+                .user-nav { border-bottom-left-radius: ${cardRadius}; border-bottom-right-radius: ${cardRadius}; }
+                .test-case { border-radius: 10px; }
+                html.ldb-bgfullscreen .article-banner.article-banner { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
+                html.ldb-bgfullscreen .article-content.article-content { border-bottom-left-radius: ${cardRadius} !important; border-bottom-right-radius: ${cardRadius} !important; }
+                html.ldb-bgfullscreen .toc.toc { border-radius: .5em !important; }
+                .meta { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }`;
         }
         if (picRounded) css += `img { border-radius: ${picRadius} !important; }`;
         style.innerHTML = css;
@@ -70,13 +73,13 @@
         const style = document.createElement('style');
         style.id = 'ldb-blur-style';
         const val = blurValue === 0 ? 'none' : `blur(${blurValue}px)`;
-        let css = 
-            `.lg-article, .card, .l-card { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` +
-            `.dropdown .center, .popup { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` +
-            `.am-comment-hd, .am-comment-bd { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` +
-            `.article-banner { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` +
-            `.top-bar, .sidebar, .nav-group, nav.lfe-body, .user-nav, .header-layout { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }` + 
-            `.dropdown, .dropdown .center, .popup,
+        let css =
+            `.lg-article, .card, .l-card { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
+            .dropdown .center, .popup { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
+            .am-comment-hd, .am-comment-bd { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
+            .article-banner { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
+            .top-bar, .sidebar, .nav-group, nav.lfe-body, .user-nav, .wrapper.wrapped.lfe-body.header-layout.tiny { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
+            .dropdown, .dropdown .center, .popup,
             .lfe-dropdown, .el-dropdown-menu,
             .el-popper, .dropdown-menu,
             .ant-dropdown, .ant-select-dropdown {
@@ -98,14 +101,29 @@
         const style = document.createElement('style');
         style.id = 'ldb-opacity-style';
         const alpha = opacityValue / 100;
-        const css = `.lg-article, .l-card, .card { background-color: rgba(255, 255, 255, ${alpha}) !important; }` +
-                    `.dropdown .center, .popup { background-color: rgba(255, 255, 255, ${alpha}) !important; }` +
-                    `.am-comment-hd, .am-comment-bd { background-color: rgba(255, 255, 255, ${alpha}) !important; }` +
-                    `nav.lfe-body > div { background-color: rgba(255, 255, 255, ${alpha}) !important; }` +
-                    `.user-header-bottom { background-color: rgba(255, 255, 255, ${alpha}) !important; }` +
-                    `.top-bar { --theme-navi-back: rgba(255, 255, 255, ${alpha}) !important; }`;
+        const css = `.lg-article, .l-card, .card { background-color: rgba(255, 255, 255, ${alpha}) !important; }
+              .dropdown .center, .popup { background-color: rgba(255, 255, 255, ${alpha}) !important; }
+              .am-comment-hd, .am-comment-bd { background-color: rgba(255, 255, 255, ${alpha}) !important; }
+              nav.lfe-body > div { background-color: rgba(255, 255, 255, ${alpha}) !important; }
+              .user-header-bottom { background-color: rgba(255, 255, 255, ${alpha}) !important; }
+              .top-bar { --theme-navi-back: rgba(255, 255, 255, ${alpha}) !important; }`;
         style.innerHTML = css;
         document.head.append(style);
+    }
+
+    function forceMainTransparent() {
+        const list = document.querySelectorAll('.main-container > main, main');
+        if (!list.length) return;
+        list.forEach(el => {
+            const bgc = el.style.getPropertyValue('background-color').trim();
+            const bg  = el.style.getPropertyValue('background').trim();
+            if (bgc && bgc !== 'transparent' && bgc !== 'rgba(0, 0, 0, 0)') {
+                el.style.setProperty('background-color', 'transparent', 'important');
+            }
+            if (bg && bg !== 'transparent' && bg !== 'none') {
+                el.style.setProperty('background', 'transparent', 'important');
+            }
+        });
     }
 
     function applyBgFullscreen() {
@@ -196,8 +214,18 @@
                 background: transparent !important;
                 background-image: none !important;
             }
-            html.ldb-bgfullscreen main.lfe-body {
+            html.ldb-bgfullscreen main,
+            html.ldb-bgfullscreen .main-container > main {
                 background: transparent !important;
+                background-color: transparent !important;
+            }
+            html.ldb-bgfullscreen .main-container,
+            html.ldb-bgfullscreen #app-old,
+            html.ldb-bgfullscreen .lg-index-content,
+            html.ldb-bgfullscreen .lg-index-content .am-g,
+            html.ldb-bgfullscreen .am-panel {
+                background: transparent !important;
+                background-color: transparent !important;
             }
             html.ldb-bgfullscreen .header-layout .background {
                 opacity: 0;
@@ -240,6 +268,8 @@
         `;
         document.head.appendChild(styleEl);
 
+        forceMainTransparent();
+
         if (themePage) {
             const themeVars = ['--theme-body-image', '--theme-body-color', '--theme-body-mid-mask', '--theme-body-color-filter'];
             const saved = themePage._ldbThemeVars = {};
@@ -268,14 +298,74 @@
         document.head.appendChild(style);
     }
 
-    function applyAll() {
-        applyRounded();
-        applyCardOpacity();
-        applyCardBlur();
-        applyBgFullscreen();
-        applyAdBlock();
-        applyCustomCSS();
-        updatePanelStyle();
+    function cleanBackground(fullClean) {
+        document.querySelectorAll('.theme-page').forEach(el => {
+            el.classList.remove('theme-frosted');
+            if (fullClean) {
+                el.removeAttribute('style');
+            }
+        });
+    }
+
+    function ensureObserverCreated() {
+        if (!bgCleanObserver) {
+            bgCleanObserver = new MutationObserver((mutations) => {
+                let needClean = false;
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList') {
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeType === 1) {
+                                if (node.matches && node.matches('.theme-page')) {
+                                    needClean = true;
+                                    break;
+                                }
+                                if (node.querySelector && node.querySelector('.theme-page')) {
+                                    needClean = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (needClean) break;
+                    }
+                    if (mutation.type === 'attributes') {
+                        const target = mutation.target;
+                        if (target.matches && target.matches('.theme-page') &&
+                            (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
+                            needClean = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (needClean) {
+                    bgCleanObserver.disconnect();
+                    isObserving = false;
+                    cleanBackground(bgFullscreen);
+                    bgCleanObserver.observe(document.documentElement, {
+                        childList: true,
+                        subtree: true,
+                        attributes: true,
+                        attributeFilter: ['style', 'class']
+                    });
+                    isObserving = true;
+                }
+            });
+        }
+    }
+
+    function toggleBackgroundCleaner(enable) {
+        ensureObserverCreated();
+        cleanBackground(enable);
+
+        if (!isObserving) {
+            bgCleanObserver.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+            isObserving = true;
+        }
     }
 
     function updatePanelStyle() {
@@ -286,6 +376,17 @@
         panelElement.style.webkitBackdropFilter = `blur(${bv}px)`;
         panelElement.style.background = `rgba(255, 255, 255, ${ov / 100})`;
         panelElement.style.color = '#1e1e2f';
+    }
+
+    function applyAll() {
+        applyRounded();
+        applyCardOpacity();
+        applyCardBlur();
+        applyBgFullscreen();
+        applyAdBlock();
+        applyCustomCSS();
+        toggleBackgroundCleaner(bgFullscreen);
+        updatePanelStyle();
     }
 
     function saveAndApply(key, value) {
@@ -335,7 +436,7 @@
                 </p>
                 <p>
                     <input id="ldb-panel-bgfullscreen" type="checkbox" ${bgFullscreen ? 'checked' : ''} />
-                    <label for="ldb-panel-bgfullscreen">背景全屏（在 <a href="/theme/list" target="_blank">主题</a> 内页首选项卡设置背景图片）</label>
+                    <label for="ldb-panel-bgfullscreen">背景全屏（在 <a href="/theme" target="_blank">主题</a> 内亮色配置选项卡启用中景图片设置背景图片）</label>
                 </p>
                 <p>
                     <input id="ldb-panel-adblock" type="checkbox" ${adBlock ? 'checked' : ''} />
@@ -618,6 +719,16 @@
         appsContainer.appendChild(newLink);
     }
 
+    let mainDomDebounce = null;
+    function scheduleMainDomWork() {
+        if (mainDomDebounce) return;
+        mainDomDebounce = setTimeout(() => {
+            mainDomDebounce = null;
+            addCustomButton();
+            if (bgFullscreen) forceMainTransparent();
+        }, 300);
+    }
+
     function init() {
         const firstUsed = localStorage.getItem("LuoguDisplayBetter-FirstUsed") == null;
         if (firstUsed) {
@@ -638,8 +749,7 @@
         addCustomButton();
         applyAll();
         const observer = new MutationObserver(() => {
-            addCustomButton();
-            if (document.querySelector('.theme-page')) applyAll();
+            scheduleMainDomWork();
         });
         observer.observe(document.body, { childList: true, subtree: true });
     }

@@ -3,7 +3,7 @@ description: Suggest a new feature for the plugin
 title: "[Feature] Describe the feature you'd like to see"
 labels: ["enhancement"]
 type: "Feature"
-assignees: ["UTF-8s", "zsTree0830"]
+assignees: ["UTF-8s", "zsTree0830", "a-small-OIer", "px-poxiao"]
 
 body:
 - type: markdown
