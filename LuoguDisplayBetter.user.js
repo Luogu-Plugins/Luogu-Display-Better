@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.2.0
+// @version      1.2.1
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
@@ -105,7 +105,7 @@
               .dropdown .center, .popup { background-color: rgba(255, 255, 255, ${alpha}) !important; }
               .am-comment-hd, .am-comment-bd { background-color: rgba(255, 255, 255, ${alpha}) !important; }
               nav.lfe-body > div { background-color: rgba(255, 255, 255, ${alpha}) !important; }
-              .user-header-bottom { background-color: rgba(255, 255, 255, ${alpha}) !important; }
+              .user-header-bottom { background-color: transparent !important; }
               .top-bar { --theme-navi-back: rgba(255, 255, 255, ${alpha}) !important; }`;
         style.innerHTML = css;
         document.head.append(style);
@@ -436,7 +436,7 @@
                 </p>
                 <p>
                     <input id="ldb-panel-bgfullscreen" type="checkbox" ${bgFullscreen ? 'checked' : ''} />
-                    <label for="ldb-panel-bgfullscreen">背景全屏（在 <a href="/theme" target="_blank">主题</a> 内亮色配置选项卡启用中景图片设置背景图片）</label>
+                    <label for="ldb-panel-bgfullscreen">背景全屏（在 <a href="/theme" target="_blank">主题</a> 内启用中景图片进行设置）</label>
                 </p>
                 <p>
                     <input id="ldb-panel-adblock" type="checkbox" ${adBlock ? 'checked' : ''} />
@@ -457,93 +457,169 @@
 
         const css = `
             #ldb-panel {
-                position: fixed;
-                right: 35px;
-                top: 50%;
-                transform: translateY(-50%);
-                padding: 28px 24px 24px;
-                background: rgba(255, 255, 255, ${(opacityValue != null ? opacityValue : 75) / 100});
-                backdrop-filter: blur(${blurValue != null ? blurValue : 10}px);
-                -webkit-backdrop-filter: blur(${blurValue != null ? blurValue : 10}px);
-                border-radius: 24px;
-                box-shadow: 0 12px 40px rgba(0,0,0,0.15);
-                color: #1e1e2f;
-                transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
-                z-index: 1000;
-                width: min(350px, 50vw);
-                max-width: 90vw;
+                position: fixed !important;
+                right: 35px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                padding: 28px 24px 24px !important;
+                background: rgba(255, 255, 255, ${(opacityValue != null ? opacityValue : 75) / 100}) !important;
+                backdrop-filter: blur(${blurValue != null ? blurValue : 10}px) !important;
+                -webkit-backdrop-filter: blur(${blurValue != null ? blurValue : 10}px) !important;
+                border-radius: 24px !important;
+                box-shadow: 0 12px 40px rgba(0,0,0,0.15) !important;
+                color: #1e1e2f !important;
+                transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease !important;
+                z-index: 2147483000 !important;
+                box-sizing: border-box !important;
+                width: min(400px, 50vw) !important;
+                max-width: calc(100vw - 70px) !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                            "PingFang SC", "Microsoft YaHei", sans-serif !important;
+                font-size: 14px !important;
+                line-height: 1.4 !important;
+                text-align: left !important;
             }
             #ldb-panel.hidden {
-                opacity: 0;
-                visibility: hidden;
-                transform: translateY(-50%) scale(0.96);
-                pointer-events: none;
+                opacity: 0 !important;
+                visibility: hidden !important;
+                transform: translateY(-50%) scale(0.96) !important;
+                pointer-events: none !important;
             }
             #ldb-panel-close {
-                position: absolute;
-                top: 12px;
-                right: 12px;
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                background: #ff4d4f;
-                border: none;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-                color: #fff;
-                font-size: 22px;
-                line-height: 1;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                transition: background 0.2s, transform 0.2s;
+                position: absolute !important;
+                top: 12px !important;
+                right: 12px !important;
+                width: 32px !important;
+                height: 32px !important;
+                padding: 1px 0 0 0 !important;
+                margin: 0 !important;
+                border: none !important;
+                border-radius: 50% !important;
+                background: #ff4d4f !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+                color: #fff !important;
+                font-family: Arial, Helvetica, sans-serif !important;
+                font-size: 22px !important;
+                font-weight: 400 !important;
+                line-height: 1 !important;
+                text-align: center !important;
+                box-sizing: border-box !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                overflow: hidden !important;
+                cursor: pointer !important;
+                transition: background 0.2s, transform 0.2s !important;
             }
-            #ldb-panel-close:hover { background: #e04345; transform: scale(1.06); }
-            #ldb-panel-close:active { transform: scale(0.92); }
-            #ldb-panel h2 { margin: 0 0 16px 0; font-size: 22px; font-weight: 600; color: #2c3e50; }
-            #ldb-panel h3 { margin: 18px 0 6px 0; font-size: 15px; font-weight: 500; color: #34495e; }
-            #ldb-panel p { margin: 6px 0 12px 0; display: flex; align-items: center; gap: 10px; font-size: 14px; }
-            #ldb-panel input[type="range"] { flex: 1; accent-color: #000; height: 4px;
-                border-radius: 2px; background: #dce3e8; cursor: pointer; }
-            #ldb-panel input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none;
-                width: 16px; height: 16px; border-radius: 50%; background: #000;
-                box-shadow: 0 1px 4px rgba(0,0,0,0.2); cursor: pointer; }
-            #ldb-panel input[type="checkbox"] { margin-right: 8px; width: 18px; height: 18px;
-                accent-color: #000; cursor: pointer; }
-            #ldb-panel label { cursor: pointer; user-select: none; }
+            #ldb-panel-close:hover  { background: #e04345 !important; transform: scale(1.06) !important; }
+            #ldb-panel-close:active { transform: scale(0.92) !important; }
+
+            #ldb-panel h2 { margin: 0 0 16px 0 !important; font-size: 22px !important;
+                            font-weight: 600 !important; color: #2c3e50 !important;
+                            line-height: 1.3 !important; }
+            #ldb-panel h3 { margin: 18px 0 6px 0 !important; font-size: 15px !important;
+                            font-weight: 500 !important; color: #34495e !important;
+                            line-height: 1.3 !important; }
+
+            #ldb-panel p {
+                margin: 6px 0 12px 0 !important;
+                padding: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                gap: 10px !important;
+                font-size: 14px !important;
+                line-height: 1.4 !important;
+            }
+            #ldb-panel p > input[type="checkbox"] {
+                flex: 0 0 auto !important;
+                width: 18px !important;
+                height: 18px !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                accent-color: #000 !important;
+                cursor: pointer !important;
+                vertical-align: middle !important;
+            }
+            #ldb-panel p > label {
+                display: inline-block !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                cursor: pointer !important;
+                user-select: none !important;
+                font-size: 14px !important;
+                font-weight: 400 !important;
+                line-height: 1 !important;
+                color: #1e1e2f !important;
+                vertical-align: middle !important;
+            }
+
+            #ldb-panel input[type="range"] {
+                flex: 1 !important;
+                accent-color: #000 !important;
+                height: 4px !important;
+                border-radius: 2px !important;
+                background: #dce3e8 !important;
+                cursor: pointer !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            #ldb-panel input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none !important;
+                width: 16px !important; height: 16px !important;
+                border-radius: 50% !important; background: #000 !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
+                cursor: pointer !important;
+            }
+
             #ldb-panel-customCSS {
-                width: 100%;
-                min-height: 60px;
-                max-height: 200px;
-                padding: 6px 8px;
+                width: 100% !important;
+                min-height: 60px !important;
+                max-height: 200px !important;
+                padding: 6px 8px !important;
                 font-family: monospace !important;
                 font-size: 13px !important;
-                resize: vertical;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                box-sizing: border-box;
+                resize: vertical !important;
+                border: 1px solid #ccc !important;
+                border-radius: 4px !important;
+                box-sizing: border-box !important;
+                line-height: 1.4 !important;
             }
             #ldb-panel-reset {
-                display: inline-block;
-                margin-top: 10px;
-                padding: 8px 24px;
-                background: #ecf0f1;
-                border: none;
-                border-radius: 30px;
-                font-size: 14px;
-                font-weight: 500;
-                color: #2c3e50;
-                cursor: pointer;
-                transition: background 0.2s, transform 0.1s;
-                box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+                display: inline-block !important;
+                margin-top: 10px !important;
+                padding: 8px 24px !important;
+                background: #ecf0f1 !important;
+                border: none !important;
+                border-radius: 30px !important;
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                color: #2c3e50 !important;
+                cursor: pointer !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
+                line-height: 1.4 !important;
+                box-sizing: border-box !important;
+                transition: background 0.2s, transform 0.1s !important;
             }
-            #ldb-panel-reset:hover { background: #d5dbe0; }
-            #ldb-panel-reset:active { transform: scale(0.96); }
-            #blur-value, #opacity-value, #rounded-value-card, #rounded-value-pic
-                { display: inline-block; width: 45px; text-align: center; font-weight: 500; }
-            #ldb-panel a { color: #0d3d41; text-decoration: none; }
-            #ldb-panel a:hover { text-decoration: underline; }
-            @media (max-width: 350px) { #ldb-panel { width: 90vw; padding: 20px 16px; right: 10px; } }
+            #ldb-panel-reset:hover  { background: #d5dbe0 !important; }
+            #ldb-panel-reset:active { transform: scale(0.96) !important; }
+
+            #blur-value, #opacity-value, #rounded-value-card, #rounded-value-pic {
+                display: inline-block !important;
+                width: 45px !important;
+                text-align: center !important;
+                font-weight: 500 !important;
+                line-height: 1 !important;
+            }
+            #ldb-panel a { color: #0d3d41 !important; text-decoration: none !important; }
+            #ldb-panel a:hover { text-decoration: underline !important; }
+
+            @media (max-width: 900px) {
+                #ldb-panel { width: 50vw !important; right: 12px !important; }
+            }
+            @media (max-width: 400px) {
+                #ldb-panel { width: calc(100vw - 20px) !important; right: 10px !important;
+                            padding: 20px 16px !important; }
+            }
         `;
         const styleEl = document.createElement('style');
         styleEl.textContent = css;
