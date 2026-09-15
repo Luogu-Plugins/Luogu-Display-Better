@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.2.1
+// @version      1.2.2
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
 // @icon         https://fecdn.luogu.com.cn/columba/static.325908fec383795b.logo-single-color.svg
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @grant        GM_info
 // @run-at       document-end
 // ==/UserScript==
 
@@ -22,9 +23,15 @@
     let bgFullscreen;
     let adBlock;
     let customCSS;
+    let updateChannel;
 
     let bgCleanObserver = null;
     let isObserving = false;
+
+    const UPDATE_URLS = {
+        stable: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
+        latest: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js'
+    };
 
     function initVarible() {
         cardborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-cardborderRad") ?? 15);
@@ -36,6 +43,7 @@
         adBlock = localStorage.getItem("LuoguDisplayBetter-adBlock") === 'true';
         bgFullscreen = localStorage.getItem("LuoguDisplayBetter-bgFullscreen") !== 'false';
         customCSS = localStorage.getItem("LuoguDisplayBetter-customCSS") ?? '';
+        updateChannel = localStorage.getItem("LuoguDisplayBetter-updateChannel") ?? 'stable';
     }
 
     function applyRounded() {
@@ -446,7 +454,18 @@
                 <p>
                     <textarea id="ldb-panel-customCSS">${customCSS}</textarea>
                 </p>
-                <button id="ldb-panel-reset">还原设置</button>
+                <h3>更新通道</h3>
+                <p>
+                    <select id="ldb-panel-updateChannel">
+                        <option value="stable" ${updateChannel === 'stable' ? 'selected' : ''}>稳定版</option>
+                        <option value="latest" ${updateChannel === 'latest' ? 'selected' : ''}>最新版</option>
+                    </select>
+                </p>
+                <p>
+                    <button id="ldb-panel-checkUpdate">检查更新</button>
+                    <button id="ldb-panel-reset">还原设置</button>
+                </p>
+                <p id="ldb-updateStatus"></p>
             </div>
         `;
 
@@ -584,9 +603,49 @@
                 box-sizing: border-box !important;
                 line-height: 1.4 !important;
             }
+            #ldb-panel-updateChannel {
+                flex: 1 !important;
+                height: 32px !important;
+                padding: 0 10px !important;
+                font-size: 14px !important;
+                font-family: inherit !important;
+                color: #1e1e2f !important;
+                background: rgba(255, 255, 255, 0.9) !important;
+                border: 1px solid #ccc !important;
+                border-radius: 8px !important;
+                box-sizing: border-box !important;
+                cursor: pointer !important;
+                outline: none !important;
+                transition: border-color 0.2s, box-shadow 0.2s !important;
+            }
+            #ldb-panel-updateChannel:hover {
+                border-color: #999 !important;
+            }
+            #ldb-panel-updateChannel:focus {
+                border-color: #000 !important;
+                box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08) !important;
+            }
+            #ldb-panel-checkUpdate {
+                display: inline-block !important;
+                margin: 0 !important;
+                padding: 8px 24px !important;
+                background: #000 !important;
+                border: none !important;
+                border-radius: 30px !important;
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                color: #fff !important;
+                cursor: pointer !important;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
+                line-height: 1.4 !important;
+                box-sizing: border-box !important;
+                transition: background 0.2s, transform 0.1s !important;
+            }
+            #ldb-panel-checkUpdate:hover  { background: #333 !important; }
+            #ldb-panel-checkUpdate:active { transform: scale(0.96) !important; }
             #ldb-panel-reset {
                 display: inline-block !important;
-                margin-top: 10px !important;
+                margin: 0 !important;
                 padding: 8px 24px !important;
                 background: #ecf0f1 !important;
                 border: none !important;
@@ -602,6 +661,20 @@
             }
             #ldb-panel-reset:hover  { background: #d5dbe0 !important; }
             #ldb-panel-reset:active { transform: scale(0.96) !important; }
+            #ldb-panel #ldb-updateStatus {
+                display: block !important;
+                margin: 4px 0 0 0 !important;
+                padding: 0 !important;
+                font-size: 12px !important;
+                line-height: 1.4 !important;
+                color: #e53935 !important;
+                text-align: left !important;
+                word-break: break-all !important;
+            }
+            #ldb-panel #ldb-updateStatus:empty {
+                display: none !important;
+                margin: 0 !important;
+            }
 
             #blur-value, #opacity-value, #rounded-value-card, #rounded-value-pic {
                 display: inline-block !important;
@@ -639,6 +712,9 @@
         const bgFullscreenCb = document.getElementById('ldb-panel-bgfullscreen');
         const adBlockCb = document.getElementById('ldb-panel-adblock');
         const customCssInput = document.getElementById('ldb-panel-customCSS');
+        const updateChannelSelect = document.getElementById('ldb-panel-updateChannel');
+        const checkUpdateBtn = document.getElementById('ldb-panel-checkUpdate');
+        const updateStatus = document.getElementById('ldb-updateStatus');
         const resetBtn = document.getElementById('ldb-panel-reset');
 
         closeBtn.addEventListener('click', () => panelElement.classList.add('hidden'));
@@ -684,7 +760,24 @@
             saveAndApply("LuoguDisplayBetter-customCSS", this.value);
         });
 
+        updateChannelSelect.addEventListener('change', function() {
+            if (updateStatus._ldbTimer) {
+                clearTimeout(updateStatus._ldbTimer);
+                updateStatus._ldbTimer = null;
+            }
+            saveAndApply("LuoguDisplayBetter-updateChannel", this.value);
+            updateStatus.textContent = '';
+        });
+
+        checkUpdateBtn.addEventListener('click', function() {
+            checkForUpdate(updateStatus);
+        });
+
         resetBtn.addEventListener('click', function() {
+            if (updateStatus._ldbTimer) {
+                clearTimeout(updateStatus._ldbTimer);
+                updateStatus._ldbTimer = null;
+            }
             localStorage.setItem("LuoguDisplayBetter-cardborderRad", 15);
             localStorage.setItem("LuoguDisplayBetter-picborderRad", 8);
             localStorage.setItem("LuoguDisplayBetter-blur", 10);
@@ -694,6 +787,7 @@
             localStorage.setItem("LuoguDisplayBetter-bgFullscreen", true);
             localStorage.setItem("LuoguDisplayBetter-opacity", 75);
             localStorage.setItem("LuoguDisplayBetter-customCSS", '');
+            localStorage.setItem("LuoguDisplayBetter-updateChannel", 'stable');
             initVarible();
             blurSlider.value = blurValue;
             cardroundedSlider.value = cardborderRad;
@@ -708,6 +802,8 @@
             bgFullscreenCb.checked = true;
             adBlockCb.checked = false;
             customCssInput.value = '';
+            updateChannelSelect.value = 'stable';
+            updateStatus.textContent = '';
             applyAll();
         });
 
@@ -716,6 +812,68 @@
                 panelElement.classList.add('hidden');
             }
         });
+    }
+
+    function checkForUpdate(statusEl) {
+        if (statusEl._ldbTimer) {
+            clearTimeout(statusEl._ldbTimer);
+            statusEl._ldbTimer = null;
+        }
+        const url = UPDATE_URLS[updateChannel];
+        if (!url) {
+            statusEl.textContent = '未知通道';
+            return;
+        }
+        statusEl.textContent = '检查中...';
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: url,
+            headers: {
+                'Cache-Control': 'no-cache'
+            },
+            onload: function(response) {
+                if (response.status !== 200) {
+                    statusEl.textContent = '获取失败 (' + response.status + ')';
+                    return;
+                }
+                const match = response.responseText.match(/\/\/\s*@version\s+([\d.]+)/);
+                if (!match) {
+                    statusEl.textContent = '无法解析版本';
+                    return;
+                }
+                const remoteVersion = match[1];
+                const localVersion = GM_info.script.version;
+                if (compareVersions(remoteVersion, localVersion) > 0) {
+                    statusEl.innerHTML = '发现新版本 v' + remoteVersion + '，' +
+                        '<a href="' + url + '" target="_blank" style="color:#0d6efd;text-decoration:underline;cursor:pointer;">点击安装</a>';
+                } else {
+                    statusEl.textContent = '已是最新版本 v' + localVersion;
+                    statusEl._ldbTimer = setTimeout(function() {
+                        statusEl.textContent = '';
+                        statusEl._ldbTimer = null;
+                    }, 2000);
+                }
+            },
+            onerror: function() {
+                statusEl.textContent = '网络请求失败';
+            },
+            ontimeout: function() {
+                statusEl.textContent = '请求超时';
+            },
+            timeout: 10000
+        });
+    }
+
+    function compareVersions(a, b) {
+        const pa = a.split('.').map(Number);
+        const pb = b.split('.').map(Number);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+            const na = pa[i] || 0;
+            const nb = pb[i] || 0;
+            if (na > nb) return 1;
+            if (na < nb) return -1;
+        }
+        return 0;
     }
 
     function togglePanel() {
@@ -818,6 +976,7 @@
             localStorage.setItem("LuoguDisplayBetter-bgFullscreen", true);
             localStorage.setItem("LuoguDisplayBetter-opacity", 75);
             localStorage.setItem("LuoguDisplayBetter-customCSS", '');
+            localStorage.setItem("LuoguDisplayBetter-updateChannel", 'stable');
         }
         initVarible();
         createPanel();
