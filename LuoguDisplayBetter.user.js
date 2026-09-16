@@ -5,6 +5,7 @@
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
+// @connect      cdn.jsdelivr.net
 // @icon         https://fecdn.luogu.com.cn/columba/static.325908fec383795b.logo-single-color.svg
 // @grant        GM_xmlhttpRequest
 // @grant        GM_info
