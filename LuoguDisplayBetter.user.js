@@ -35,11 +35,6 @@
         latest: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js'
     };
 
-    const UPDATE_URLS = {
-        stable: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
-        latest: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js'
-    };
-
     function initVarible() {
         cardborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-cardborderRad") ?? 15);
         picborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-picborderRad") ?? 8);
