@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.2.2
+// @version      1.2.3
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
@@ -28,6 +28,7 @@
 
     let bgCleanObserver = null;
     let isObserving = false;
+    let adBlockObserver = null;
 
     const UPDATE_URLS = {
         stable: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
@@ -104,20 +105,35 @@
     function applyCardOpacity() {
         const old = document.getElementById('ldb-opacity-style');
         if (old) old.remove();
-        if (opacityValue === undefined || isNaN(opacityValue)) {
-            return;
+        if (opacityValue === undefined || isNaN(opacityValue)) return;
+
+        const alpha = opacityValue / 100;
+
+        const themePage = document.querySelector('.theme-page');
+        let baseColor = '255, 255, 255';
+        if (themePage) {
+            const native = getComputedStyle(themePage)
+                .getPropertyValue('--theme-card-background')
+                .trim();
+            if (native) {
+                const m = native.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
+                if (m) baseColor = `${m[1]}, ${m[2]}, ${m[3]}`;
+            }
         }
+        const cardColor = `rgba(${baseColor}, ${alpha})`;
+
         const style = document.createElement('style');
         style.id = 'ldb-opacity-style';
-        const alpha = opacityValue / 100;
-        const css = `.lg-article, .l-card, .card { background-color: rgba(255, 255, 255, ${alpha}) !important; }
-              .dropdown .center, .popup { background-color: rgba(255, 255, 255, ${alpha}) !important; }
-              .am-comment-hd, .am-comment-bd { background-color: rgba(255, 255, 255, ${alpha}) !important; }
-              nav.lfe-body > div { background-color: rgba(255, 255, 255, ${alpha}) !important; }
-              .user-header-bottom { background-color: transparent !important; }
-              .top-bar { --theme-navi-back: rgba(255, 255, 255, ${alpha}) !important; }`;
-        style.innerHTML = css;
+        style.innerHTML = `.lg-article, .l-card, .card { background-color: ${cardColor} !important; }
+              .dropdown .center, .popup { background-color: ${cardColor} !important; }
+              .am-comment-hd, .am-comment-bd { background-color: ${cardColor} !important; }
+              nav.lfe-body > div { background-color: ${cardColor} !important; }
+              .user-header-bottom { background-color: transparent !important; }`;
         document.head.append(style);
+
+        if (themePage) {
+            themePage.style.setProperty('--theme-card-background', cardColor);
+        }
     }
 
     function forceMainTransparent() {
@@ -141,25 +157,69 @@
         document.documentElement.classList.remove('ldb-bgfullscreen');
 
         const themePage = document.querySelector('.theme-page');
-        if (themePage && themePage._ldbThemeVars) {
-            for (const [key, value] of Object.entries(themePage._ldbThemeVars)) {
-                themePage.style.setProperty(key, value);
+
+        if (themePage && themePage._ldbSavedVars) {
+            for (const [key, value] of Object.entries(themePage._ldbSavedVars)) {
+                if (value) {
+                    themePage.style.setProperty(key, value);
+                } else {
+                    themePage.style.removeProperty(key);
+                }
             }
-            delete themePage._ldbThemeVars;
+            delete themePage._ldbSavedVars;
         }
 
         if (!bgFullscreen) return;
 
         let bgImage = null;
+        let bgRepeat = 'no-repeat';
+        let bgSize = 'cover';
+        let bgPosition = 'center';
+        let bgFilter = 'none';
 
-        const themeScript = document.getElementById('luogu-theme');
-        if (themeScript) {
-            try {
-                const themeData = JSON.parse(themeScript.textContent);
-                if (themeData?.lBody?.image) {
-                    bgImage = `url("${themeData.lBody.image}")`;
+        if (themePage) {
+            const cs = getComputedStyle(themePage);
+
+            const img = cs.getPropertyValue('--theme-body-image').trim();
+            if (img && img !== 'none') {
+                const urlMatch = img.match(/url\(["']?([^"')]+)["']?\)/);
+                bgImage = urlMatch ? `url("${urlMatch[1]}")` : `url("${img.replace(/^["']|["']$/g, '')}")`;
+            }
+
+            const repeatVal = cs.getPropertyValue('--theme-body-image-repeat').trim();
+            if (repeatVal) bgRepeat = repeatVal;
+
+            const sizeVal = cs.getPropertyValue('--theme-body-image-size').trim();
+            if (sizeVal) bgSize = sizeVal;
+
+            const posVal = cs.getPropertyValue('--theme-body-image-position').trim();
+            if (posVal) bgPosition = posVal;
+
+            const filterVal = cs.getPropertyValue('--theme-body-color-filter').trim();
+            if (filterVal && filterVal !== 'none') bgFilter = filterVal;
+        }
+
+        if (!bgImage) {
+            const themeScript = document.getElementById('luogu-theme');
+            if (themeScript) {
+                try {
+                    const themeData = JSON.parse(themeScript.textContent);
+                    if (themeData?.lBody?.image) {
+                        bgImage = `url("${themeData.lBody.image}")`;
+                        const midOpts = themeData.lBody.midOpts || {};
+                        if (midOpts.size) bgSize = midOpts.size;
+                        if (Array.isArray(midOpts.position) && midOpts.position.length >= 2) {
+                            bgPosition = `${midOpts.position[0]}% ${midOpts.position[1]}%`;
+                        }
+                        if (typeof midOpts.brightness === 'number' && midOpts.brightness !== 0) {
+                            bgFilter = `brightness(${100 + midOpts.brightness}%)`;
+                        }
+                        if (typeof midOpts.notEmpty === 'boolean') {
+                            bgRepeat = midOpts.notEmpty ? 'no-repeat' : 'repeat';
+                        }
+                    }
+                } catch (e) {
                 }
-            } catch (e) {
             }
         }
 
@@ -168,20 +228,37 @@
             if (bgDiv) {
                 const style = getComputedStyle(bgDiv);
                 const img = style.backgroundImage;
-                if (img && img !== 'none') bgImage = img;
-            }
-        }
-
-        if (!bgImage && themePage) {
-            const style = getComputedStyle(themePage);
-            const img = style.getPropertyValue('--theme-body-image').trim();
-            if (img && img !== 'none') {
-                const urlMatch = img.match(/url\(["']?([^"')]+)["']?\)/);
-                bgImage = urlMatch ? `url("${urlMatch[1]}")` : `url("${img.replace(/^["']|["']$/g, '')}")`;
+                if (img && img !== 'none') {
+                    bgImage = img;
+                    if (style.backgroundRepeat) bgRepeat = style.backgroundRepeat;
+                    if (style.backgroundSize) bgSize = style.backgroundSize;
+                    if (style.backgroundPosition) bgPosition = style.backgroundPosition;
+                }
             }
         }
 
         if (!bgImage || bgImage === 'none') return;
+
+        if (themePage) {
+            const varsToOverride = [
+                '--theme-body-image',
+                '--theme-body-color',
+                '--theme-body-mid-mask',
+                '--theme-body-color-filter',
+                '--theme-body-back'
+            ];
+            const savedVars = {};
+            for (const v of varsToOverride) {
+                savedVars[v] = themePage.style.getPropertyValue(v);
+            }
+            themePage._ldbSavedVars = savedVars;
+
+            themePage.style.setProperty('--theme-body-image', 'none');
+            themePage.style.setProperty('--theme-body-color', 'none');
+            themePage.style.setProperty('--theme-body-mid-mask', 'none');
+            themePage.style.setProperty('--theme-body-color-filter', 'none');
+            themePage.style.setProperty('--theme-body-back', 'transparent');
+        }
 
         const nav = document.querySelector('.container nav');
         if (nav && location.pathname === '/') nav.classList.remove('user-nav');
@@ -191,6 +268,26 @@
         const styleEl = document.createElement('style');
         styleEl.id = 'ldb-bgfullscreen-style';
         styleEl.textContent = `
+            html.ldb-bgfullscreen {
+                background: transparent !important;
+                background-image: none !important;
+            }
+            html.ldb-bgfullscreen::before {
+                content: '' !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                z-index: -1 !important;
+                pointer-events: none !important;
+                background-image: ${bgImage} !important;
+                background-repeat: ${bgRepeat} !important;
+                background-position: ${bgPosition} !important;
+                background-size: ${bgSize} !important;
+                filter: ${bgFilter} !important;
+                -webkit-filter: ${bgFilter} !important;
+            }
             .header-layout.tiny[data-v-7ddab1d5], .lfe-body[data-v-12f19ddc] {
                 background: transparent !important;
             }
@@ -210,14 +307,6 @@
                 background: white !important;
                 box-shadow: 0 2px 4px 0 rgba(0, 0, 0, .15), 0 0 1px 0 rgba(0, 0, 0, .5) inset;
                 padding: 3px 8px;
-            }
-
-            html.ldb-bgfullscreen {
-                background-image: ${bgImage} !important;
-                background-repeat: no-repeat !important;
-                background-position: center !important;
-                background-size: cover !important;
-                background-attachment: fixed !important;
             }
             html.ldb-bgfullscreen body {
                 background: transparent !important;
@@ -278,23 +367,25 @@
         document.head.appendChild(styleEl);
 
         forceMainTransparent();
-
-        if (themePage) {
-            const themeVars = ['--theme-body-image', '--theme-body-color', '--theme-body-mid-mask', '--theme-body-color-filter'];
-            const saved = themePage._ldbThemeVars = {};
-            for (const v of themeVars) {
-                const val = themePage.style.getPropertyValue(v);
-                if (val) saved[v] = val;
-                themePage.style.setProperty(v, 'none');
-            }
-            themePage.style.setProperty('--theme-body-back', 'transparent');
-        }
     }
 
     function applyAdBlock() {
-        const ad = document.querySelector('.side div[data-v-ce0b4304]');
-        if (!ad) return;
-        ad.style.display = adBlock ? 'none' : '';
+        const styleId = 'ldb-adblock-style';
+        const old = document.getElementById(styleId);
+        if (old) old.remove();
+        if (!adBlock) return;
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `.side div[data-v-ce0b4304] { display: none !important; }`;
+        document.head.appendChild(style);
+    }
+
+    function startAdBlockObserver() {
+        if (adBlockObserver) return;
+        adBlockObserver = new MutationObserver(() => {
+            applyAdBlock();
+        });
+        adBlockObserver.observe(document.body, { childList: true, subtree: true });
     }
 
     function applyCustomCSS() {
@@ -307,65 +398,24 @@
         document.head.appendChild(style);
     }
 
-    function cleanBackground(fullClean) {
+    function cleanBackground() {
         document.querySelectorAll('.theme-page').forEach(el => {
-            el.classList.remove('theme-frosted');
-            if (fullClean) {
-                el.removeAttribute('style');
+            if (el.classList.contains('theme-frosted')) {
+                el.classList.remove('theme-frosted');
             }
         });
     }
 
     function ensureObserverCreated() {
-        if (!bgCleanObserver) {
-            bgCleanObserver = new MutationObserver((mutations) => {
-                let needClean = false;
-                for (const mutation of mutations) {
-                    if (mutation.type === 'childList') {
-                        for (const node of mutation.addedNodes) {
-                            if (node.nodeType === 1) {
-                                if (node.matches && node.matches('.theme-page')) {
-                                    needClean = true;
-                                    break;
-                                }
-                                if (node.querySelector && node.querySelector('.theme-page')) {
-                                    needClean = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (needClean) break;
-                    }
-                    if (mutation.type === 'attributes') {
-                        const target = mutation.target;
-                        if (target.matches && target.matches('.theme-page') &&
-                            (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
-                            needClean = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (needClean) {
-                    bgCleanObserver.disconnect();
-                    isObserving = false;
-                    cleanBackground(bgFullscreen);
-                    bgCleanObserver.observe(document.documentElement, {
-                        childList: true,
-                        subtree: true,
-                        attributes: true,
-                        attributeFilter: ['style', 'class']
-                    });
-                    isObserving = true;
-                }
-            });
-        }
+        if (bgCleanObserver) return;
+        bgCleanObserver = new MutationObserver(() => {
+            cleanBackground();
+        });
     }
 
-    function toggleBackgroundCleaner(enable) {
+    function toggleBackgroundCleaner() {
         ensureObserverCreated();
-        cleanBackground(enable);
-
+        cleanBackground();
         if (!isObserving) {
             bgCleanObserver.observe(document.documentElement, {
                 childList: true,
@@ -394,7 +444,7 @@
         applyBgFullscreen();
         applyAdBlock();
         applyCustomCSS();
-        toggleBackgroundCleaner(bgFullscreen);
+        toggleBackgroundCleaner();
         updatePanelStyle();
     }
 
@@ -907,7 +957,7 @@
                 newA.className = sampleA.className;
                 newA.setAttribute('disabled', sampleA.getAttribute('disabled') || 'false');
             }
-            newA.href = '#';
+            newA.href = 'javascript:void(0);';
             newA.id = 'stylePluginSettingButton';
             const span = document.createElement('span');
             const sampleSpan = sampleLi.querySelector('span.title');
@@ -944,7 +994,7 @@
         }
         newLink.setAttribute('colorscheme', sample.getAttribute('colorscheme') || 'none');
         newLink.className = sample.className;
-        newLink.href = '#';
+        newLink.href = 'javascript:void(0);';
         newLink.innerText = '美化插件设置';
         newLink.id = 'stylePluginSettingButton';
         newLink.addEventListener('click', function(event) {
@@ -983,6 +1033,7 @@
         createPanel();
         if (firstUsed) togglePanel();
         addCustomButton();
+        startAdBlockObserver();
         applyAll();
         const observer = new MutationObserver(() => {
             scheduleMainDomWork();
