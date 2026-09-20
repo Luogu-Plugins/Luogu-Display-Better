@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.2.3
+// @version      1.3.0
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
@@ -69,7 +69,9 @@
                 html.ldb-bgfullscreen .article-banner.article-banner { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
                 html.ldb-bgfullscreen .article-content.article-content { border-bottom-left-radius: ${cardRadius} !important; border-bottom-right-radius: ${cardRadius} !important; }
                 html.ldb-bgfullscreen .toc.toc { border-radius: .5em !important; }
-                .meta { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }`;
+                .meta { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
+                .ide-container { border-radius: ${cardRadius} !important; }
+                .ide-textarea[readonly].lfe-code { border-bottom-right-radius: ${cardRadius} !important; }`;
         }
         if (picRounded) css += `img { border-radius: ${picRadius} !important; }`;
         style.innerHTML = css;
@@ -128,7 +130,15 @@
               .dropdown .center, .popup { background-color: ${cardColor} !important; }
               .am-comment-hd, .am-comment-bd { background-color: ${cardColor} !important; }
               nav.lfe-body > div { background-color: ${cardColor} !important; }
-              .user-header-bottom { background-color: transparent !important; }`;
+              .user-header-bottom { background-color: transparent !important; }
+              html { scrollbar-color: rgba(139, 139, 139, 1) rgba(255, 255, 255, 0); }
+              .ide-container { background-color: ${cardColor} !important; }
+              .panel-layout>.panel-divider.with-icon { background-color: transparent !important; }
+              .panel-layout>.panel-divider.dragging { background-color: var(--lfe-color--primary) !important; }
+              .ͼ2 .cm-gutters, .ide-toolbar { background-color: transparent !important; border: 0px solid transparent !important; }
+              input:not([type=range]), textarea, .refined-input { background-color: transparent !important; }
+              .panel-divider, .layout-horizontal>.panel-divider { background-color: transparent !important; }
+              .combo-wrapper>.text, .dropdown { background-color: transparent !important; }`;
         document.head.append(style);
 
         if (themePage) {
@@ -403,6 +413,9 @@
             if (el.classList.contains('theme-frosted')) {
                 el.classList.remove('theme-frosted');
             }
+            if (el.hasAttribute('style')) {
+                el.removeAttribute('style');
+            }
         });
     }
 
@@ -437,6 +450,59 @@
         panelElement.style.color = '#1e1e2f';
     }
 
+    function applyMainContainerPadding() {
+        const old = document.getElementById('ldb-main-padding-style');
+        if (old) old.remove();
+
+        const topBar = document.querySelector('.top-bar');
+        const topH = topBar ? topBar.getBoundingClientRect().height : 48;
+
+        const style = document.createElement('style');
+        style.id = 'ldb-main-padding-style';
+        style.textContent = `
+            .main-container.lside-nav {
+                padding: 10px !important;
+                box-sizing: border-box !important;
+                background: transparent !important;
+                height: calc(100vh - ${topH}px) !important;
+                max-height: calc(100vh - ${topH}px) !important;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+            .main-container.lside-nav > .panel-layout.ide-container {
+                flex: 1 1 auto !important;
+                height: 100% !important;
+                min-height: 0 !important;
+                min-width: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                box-sizing: border-box !important;
+            }
+            .main-container.lside-nav .panel-layout,
+            .main-container.lside-nav .panel {
+                min-height: 0 !important;
+                min-width: 0 !important;
+                box-sizing: border-box !important;
+            }
+            .ide-textarea.lfe-code {
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
+                box-sizing: border-box !important;
+                max-width: 100% !important;
+            }
+            .ide-textarea.lfe-code::-webkit-scrollbar {
+                display: none !important;
+                width: 0 !important;
+                height: 0 !important;
+            }
+            .ide-textarea.lfe-code::-webkit-scrollbar-corner {
+                display: none !important;
+                background: transparent !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     function applyAll() {
         applyRounded();
         applyCardOpacity();
@@ -444,6 +510,7 @@
         applyBgFullscreen();
         applyAdBlock();
         applyCustomCSS();
+        applyMainContainerPadding();
         toggleBackgroundCleaner();
         updatePanelStyle();
     }
@@ -1010,6 +1077,7 @@
         mainDomDebounce = setTimeout(() => {
             mainDomDebounce = null;
             addCustomButton();
+            applyMainContainerPadding();
             if (bgFullscreen) forceMainTransparent();
         }, 300);
     }
