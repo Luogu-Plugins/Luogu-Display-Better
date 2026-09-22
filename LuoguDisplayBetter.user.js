@@ -1,14 +1,16 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.3.0
+// @version      1.4.0
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
 // @connect      cdn.jsdelivr.net
 // @icon         https://fecdn.luogu.com.cn/columba/static.325908fec383795b.logo-single-color.svg
+// @grant        GM_addElement
 // @grant        GM_xmlhttpRequest
 // @grant        GM_info
+// @grant        unsafeWindow
 // @run-at       document-end
 // ==/UserScript==
 
@@ -30,10 +32,137 @@
     let isObserving = false;
     let adBlockObserver = null;
 
+    let customCssEditor = null;
+    let customCssSaveTimer = null;
+    let cmLoaded = false;
+
     const UPDATE_URLS = {
         stable: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
         latest: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js'
     };
+
+    const CM5_BASE = 'https://cdn.jsdelivr.net/npm/codemirror@5.65.21';
+
+    function gmGet(url) {
+        return new Promise(function(resolve, reject) {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                onload: function(r) {
+                    if (r.status >= 200 && r.status < 300) resolve(r.responseText);
+                    else reject(new Error('HTTP ' + r.status + ' for ' + url));
+                },
+                onerror: function() { reject(new Error('Network error: ' + url)); },
+                ontimeout: function() { reject(new Error('Timeout: ' + url)); },
+                timeout: 30000
+            });
+        });
+    }
+
+    function injectStyle(cssText) {
+        GM_addElement(document.head, 'style', { textContent: cssText });
+    }
+
+    function injectScript(jsText) {
+        return new Promise(function(resolve, reject) {
+            const blob = new Blob([jsText], { type: 'application/javascript' });
+            const url = URL.createObjectURL(blob);
+            const s = document.createElement('script');
+            s.src = url;
+            s.onload = function() {
+                URL.revokeObjectURL(url);
+                resolve();
+            };
+            s.onerror = function() {
+                URL.revokeObjectURL(url);
+                reject(new Error('script load error'));
+            };
+            (document.head || document.documentElement).appendChild(s);
+        });
+    }
+
+    function loadCodeMirror(callback) {
+        if (cmLoaded) {
+            callback(unsafeWindow.CodeMirror || window.CodeMirror);
+            return;
+        }
+        const win = unsafeWindow || window;
+        if (win._ldbCM5Loading) {
+            win._ldbCM5Loading.push(callback);
+            return;
+        }
+        win._ldbCM5Loading = [callback];
+
+        const files = [
+            { url: CM5_BASE + '/lib/codemirror.css', type: 'css' },
+            { url: CM5_BASE + '/lib/codemirror.js',  type: 'js'  },
+            { url: CM5_BASE + '/mode/css/css.js',    type: 'js'  },
+            { url: CM5_BASE + '/addon/edit/closebrackets.js', type: 'js' },
+            { url: CM5_BASE + '/addon/edit/matchbrackets.js', type: 'js' },
+            { url: CM5_BASE + '/addon/selection/active-line.js', type: 'js' }
+        ];
+
+        const texts = new Array(files.length);
+        let remaining = files.length;
+        let failed = false;
+
+        function done() {
+            remaining--;
+            if (remaining > 0) return;
+
+            const cbs = win._ldbCM5Loading || [];
+            win._ldbCM5Loading = null;
+
+            if (failed) {
+                console.error('[Luogu Display Better] CodeMirror 5 加载失败: 有文件下载失败');
+                cbs.forEach(function(cb) { cb(null); });
+                return;
+            }
+
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].type === 'css') injectStyle(texts[i]);
+            }
+
+            const jsFiles = files.filter(f => f.type === 'js');
+            const jsTexts = jsFiles.map(f => texts[files.indexOf(f)]);
+
+            (async function() {
+                try {
+                    for (let i = 0; i < jsFiles.length; i++) {
+                        await injectScript(jsTexts[i]);
+                    }
+                } catch (e) {
+                    console.error('[Luogu Display Better] JS 注入异常:', e);
+                    cbs.forEach(function(cb) { cb(null); });
+                    return;
+                }
+
+                const CM = win.CodeMirror || window.CodeMirror;
+                if (!CM) {
+                    console.error('[Luogu Display Better] CodeMirror 未挂载',
+                        'unsafeWindow.CodeMirror =', win.CodeMirror,
+                        'sandbox window.CodeMirror =', window.CodeMirror);
+                    cbs.forEach(function(cb) { cb(null); });
+                    return;
+                }
+
+                cmLoaded = true;
+                cbs.forEach(function(cb) { cb(CM); });
+            })();
+        }
+
+        files.forEach(function(f, i) {
+            gmGet(f.url).then(function(text) {
+                texts[i] = text;
+                done();
+            }).catch(function(err) {
+                console.warn('[Luogu Display Better] 加载失败:', f.url, err.message);
+                failed = true;
+                texts[i] = '';
+                done();
+            });
+        });
+    }
 
     function initVarible() {
         cardborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-cardborderRad") ?? 15);
@@ -71,7 +200,13 @@
                 html.ldb-bgfullscreen .toc.toc { border-radius: .5em !important; }
                 .meta { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
                 .ide-container { border-radius: ${cardRadius} !important; }
-                .ide-textarea[readonly].lfe-code { border-bottom-right-radius: ${cardRadius} !important; }`;
+                .ide-textarea[readonly].lfe-code { border-bottom-right-radius: ${cardRadius} !important; }
+                .am-viewport { border-radius: ${cardRadius} !important; }
+                .am-slider-default {
+                    background-color: transparent !important;
+                    -webkit-box-shadow: 0 0 0px rgba(0,0,0,0) !important;
+                    box-shadow: 0 0 0px rgba(0,0,0,0) !important;
+                }`;
         }
         if (picRounded) css += `img { border-radius: ${picRadius} !important; }`;
         style.innerHTML = css;
@@ -98,7 +233,9 @@
                 z-index: 999999 !important;
                 transform: translateZ(0) !important;
             }
-            .dropdown, .dropdown-container, [class*="dropdown"] { overflow: visible !important; }
+            .dropdown-container, .el-popper, .el-dropdown-menu,
+            .lfe-dropdown, .ant-dropdown, .ant-select-dropdown,
+            .dropdown-menu { overflow: visible !important; }
             .header-layout, .top-bar { z-index: 1000 !important; }`;
         style.innerHTML = css;
         document.head.append(style);
@@ -131,14 +268,15 @@
               .am-comment-hd, .am-comment-bd { background-color: ${cardColor} !important; }
               nav.lfe-body > div { background-color: ${cardColor} !important; }
               .user-header-bottom { background-color: transparent !important; }
-              html { scrollbar-color: rgba(139, 139, 139, 1) rgba(255, 255, 255, 0); }
               .ide-container { background-color: ${cardColor} !important; }
               .panel-layout>.panel-divider.with-icon { background-color: transparent !important; }
               .panel-layout>.panel-divider.dragging { background-color: var(--lfe-color--primary) !important; }
               .ͼ2 .cm-gutters, .ide-toolbar { background-color: transparent !important; border: 0px solid transparent !important; }
               input:not([type=range]), textarea, .refined-input { background-color: transparent !important; }
               .panel-divider, .layout-horizontal>.panel-divider { background-color: transparent !important; }
-              .combo-wrapper>.text, .dropdown { background-color: transparent !important; }`;
+              .combo-wrapper>.text, .lform-size-middle.block-item.tag-button,
+              .casket.cs-main, .casket .cs-header, .cs-footer,
+              code[class*=language-], pre[class*=language-], .lfe-code { background-color: transparent !important; }`;
         document.head.append(style);
 
         if (themePage) {
@@ -151,7 +289,7 @@
         if (!list.length) return;
         list.forEach(el => {
             const bgc = el.style.getPropertyValue('background-color').trim();
-            const bg  = el.style.getPropertyValue('background').trim();
+            const bg = el.style.getPropertyValue('background').trim();
             if (bgc && bgc !== 'transparent' && bgc !== 'rgba(0, 0, 0, 0)') {
                 el.style.setProperty('background-color', 'transparent', 'important');
             }
@@ -408,6 +546,73 @@
         document.head.appendChild(style);
     }
 
+    function applyIdePadding() {
+        const styleId = 'ldb-ide-padding-style';
+        const old = document.getElementById(styleId);
+        if (old) old.remove();
+
+        const mainContainer = document.querySelector('.main-container.lside-nav');
+        if (!mainContainer) return;
+
+        const isIdePage = !!mainContainer.querySelector('.panel-layout.ide-container');
+        const topBar = document.querySelector('.top-bar');
+        const topH = topBar ? topBar.getBoundingClientRect().height : 48;
+
+        let css = `
+            .main-container.lside-nav {
+                padding: 10px !important;
+                box-sizing: border-box !important;
+                background: transparent !important;
+            }
+        `;
+
+        if (isIdePage) {
+            css += `
+                .main-container.lside-nav {
+                    height: calc(100vh - ${topH}px) !important;
+                    max-height: calc(100vh - ${topH}px) !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                }
+                .main-container.lside-nav > .panel-layout.ide-container {
+                    flex: 1 1 auto !important;
+                    height: 100% !important;
+                    min-height: 0 !important;
+                    min-width: 0 !important;
+                    width: 100% !important;
+                    margin: 0 !important;
+                    box-sizing: border-box !important;
+                }
+                .main-container.lside-nav .panel-layout,
+                .main-container.lside-nav .panel {
+                    min-height: 0 !important;
+                    min-width: 0 !important;
+                    box-sizing: border-box !important;
+                }
+                .ide-textarea.lfe-code {
+                    scrollbar-width: none !important;
+                    -ms-overflow-style: none !important;
+                    box-sizing: border-box !important;
+                    max-width: 100% !important;
+                }
+                .ide-textarea.lfe-code::-webkit-scrollbar {
+                    display: none !important;
+                    width: 0 !important;
+                    height: 0 !important;
+                }
+                .ide-textarea.lfe-code::-webkit-scrollbar-corner {
+                    display: none !important;
+                    background: transparent !important;
+                }
+            `;
+        }
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = css;
+        document.head.appendChild(style);
+    }
+
     function cleanBackground() {
         document.querySelectorAll('.theme-page').forEach(el => {
             if (el.classList.contains('theme-frosted')) {
@@ -424,6 +629,31 @@
         bgCleanObserver = new MutationObserver(() => {
             cleanBackground();
         });
+    }
+
+    function applyScrollbarStyle() {
+        const styleId = 'ldb-scrollbar-style';
+        const old = document.getElementById(styleId);
+        if (old) old.remove();
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            * {
+                scrollbar-color: rgb(139, 139, 139) transparent;
+            }
+
+            nav.sidebar::-webkit-scrollbar,
+            .dropdown::-webkit-scrollbar {
+                width: 8px;
+            }
+            nav.sidebar::-webkit-scrollbar-thumb,
+            .dropdown::-webkit-scrollbar-thumb {
+                background: rgb(139, 139, 139);
+                border-radius: 4px;
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     function toggleBackgroundCleaner() {
@@ -450,59 +680,6 @@
         panelElement.style.color = '#1e1e2f';
     }
 
-    function applyMainContainerPadding() {
-        const old = document.getElementById('ldb-main-padding-style');
-        if (old) old.remove();
-
-        const topBar = document.querySelector('.top-bar');
-        const topH = topBar ? topBar.getBoundingClientRect().height : 48;
-
-        const style = document.createElement('style');
-        style.id = 'ldb-main-padding-style';
-        style.textContent = `
-            .main-container.lside-nav {
-                padding: 10px !important;
-                box-sizing: border-box !important;
-                background: transparent !important;
-                height: calc(100vh - ${topH}px) !important;
-                max-height: calc(100vh - ${topH}px) !important;
-                display: flex !important;
-                flex-direction: column !important;
-            }
-            .main-container.lside-nav > .panel-layout.ide-container {
-                flex: 1 1 auto !important;
-                height: 100% !important;
-                min-height: 0 !important;
-                min-width: 0 !important;
-                width: 100% !important;
-                margin: 0 !important;
-                box-sizing: border-box !important;
-            }
-            .main-container.lside-nav .panel-layout,
-            .main-container.lside-nav .panel {
-                min-height: 0 !important;
-                min-width: 0 !important;
-                box-sizing: border-box !important;
-            }
-            .ide-textarea.lfe-code {
-                scrollbar-width: none !important;
-                -ms-overflow-style: none !important;
-                box-sizing: border-box !important;
-                max-width: 100% !important;
-            }
-            .ide-textarea.lfe-code::-webkit-scrollbar {
-                display: none !important;
-                width: 0 !important;
-                height: 0 !important;
-            }
-            .ide-textarea.lfe-code::-webkit-scrollbar-corner {
-                display: none !important;
-                background: transparent !important;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
     function applyAll() {
         applyRounded();
         applyCardOpacity();
@@ -510,7 +687,8 @@
         applyBgFullscreen();
         applyAdBlock();
         applyCustomCSS();
-        applyMainContainerPadding();
+        applyIdePadding();
+        applyScrollbarStyle();
         toggleBackgroundCleaner();
         updatePanelStyle();
     }
@@ -569,9 +747,7 @@
                     <label for="ldb-panel-adblock">关闭广告</label>
                 </p>
                 <h3>自定义 CSS</h3>
-                <p>
-                    <textarea id="ldb-panel-customCSS">${customCSS}</textarea>
-                </p>
+                <div id="ldb-panel-customCSS"></div>
                 <h3>更新通道</h3>
                 <p>
                     <select id="ldb-panel-updateChannel">
@@ -610,6 +786,8 @@
                 box-sizing: border-box !important;
                 width: min(400px, 50vw) !important;
                 max-width: calc(100vw - 70px) !important;
+                max-height: calc(100vh - 40px) !important;
+                overflow-y: auto !important;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
                             "PingFang SC", "Microsoft YaHei", sans-serif !important;
                 font-size: 14px !important;
@@ -710,17 +888,45 @@
 
             #ldb-panel-customCSS {
                 width: 100% !important;
-                min-height: 60px !important;
-                max-height: 200px !important;
-                padding: 6px 8px !important;
-                font-family: monospace !important;
-                font-size: 13px !important;
-                resize: vertical !important;
+                height: clamp(80px, calc(100vh - 720px), 120px) !important;
                 border: 1px solid #ccc !important;
                 border-radius: 4px !important;
                 box-sizing: border-box !important;
-                line-height: 1.4 !important;
+                overflow: hidden !important;
+                background: rgba(255, 255, 255, 0.9) !important;
             }
+            #ldb-panel-customCSS .CodeMirror {
+                height: 100% !important;
+                font-family: Consolas, "Courier New", monospace !important;
+                font-size: 13px !important;
+                line-height: 1.5 !important;
+                background: transparent !important;
+                color: #1e1e2f !important;
+            }
+            #ldb-panel-customCSS .CodeMirror-gutters {
+                background: transparent !important;
+                border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+            }
+            #ldb-panel-customCSS .CodeMirror-linenumber {
+                color: #9aa4ad !important;
+            }
+            #ldb-panel-customCSS .CodeMirror-cursor {
+                border-left: 1px solid #1e1e2f !important;
+            }
+            #ldb-panel-customCSS .CodeMirror-selected,
+            #ldb-panel-customCSS .CodeMirror-selectedtext {
+                background: rgba(0, 0, 0, 0.08) !important;
+            }
+            #ldb-panel-customCSS .CodeMirror-activeline-background {
+                background: rgba(0, 0, 0, 0.03) !important;
+            }
+            #ldb-panel-customCSS .CodeMirror-focused .CodeMirror-selected {
+                background: rgba(0, 0, 0, 0.10) !important;
+            }
+            #ldb-panel-customCSS .CodeMirror-lines {
+                padding: 6px 0 !important;
+            }
+
             #ldb-panel-updateChannel {
                 flex: 1 !important;
                 height: 32px !important;
@@ -829,11 +1035,38 @@
         const picRoundedCb = document.getElementById('ldb-panel-pic-rounded');
         const bgFullscreenCb = document.getElementById('ldb-panel-bgfullscreen');
         const adBlockCb = document.getElementById('ldb-panel-adblock');
-        const customCssInput = document.getElementById('ldb-panel-customCSS');
         const updateChannelSelect = document.getElementById('ldb-panel-updateChannel');
         const checkUpdateBtn = document.getElementById('ldb-panel-checkUpdate');
         const updateStatus = document.getElementById('ldb-updateStatus');
         const resetBtn = document.getElementById('ldb-panel-reset');
+
+        const customCssContainer = document.getElementById('ldb-panel-customCSS');
+        loadCodeMirror(function(CM) {
+            if (!CM || !customCssContainer) return;
+            customCssEditor = CM(customCssContainer, {
+                value: customCSS,
+                mode: 'css',
+                lineNumbers: true,
+                lineWrapping: true,
+                tabSize: 2,
+                indentUnit: 2,
+                smartIndent: true,
+                autoCloseBrackets: true,
+                matchBrackets: true,
+                styleActiveLine: true,
+                theme: 'default'
+            });
+
+            customCssEditor.on('change', function() {
+                if (customCssSaveTimer) clearTimeout(customCssSaveTimer);
+                customCssSaveTimer = setTimeout(function() {
+                    customCssSaveTimer = null;
+                    if (!customCssEditor) return;
+                    customCSS = customCssEditor.getValue();
+                    saveAndApply("LuoguDisplayBetter-customCSS", customCSS);
+                }, 300);
+            });
+        });
 
         closeBtn.addEventListener('click', () => panelElement.classList.add('hidden'));
 
@@ -871,11 +1104,6 @@
 
         adBlockCb.addEventListener('change', function() {
             saveAndApply("LuoguDisplayBetter-adBlock", this.checked);
-        });
-
-        customCssInput.addEventListener('input', function() {
-            customCSS = this.value;
-            saveAndApply("LuoguDisplayBetter-customCSS", this.value);
         });
 
         updateChannelSelect.addEventListener('change', function() {
@@ -919,7 +1147,12 @@
             picRoundedCb.checked = true;
             bgFullscreenCb.checked = true;
             adBlockCb.checked = false;
-            customCssInput.value = '';
+            if (customCssSaveTimer) {
+                clearTimeout(customCssSaveTimer);
+                customCssSaveTimer = null;
+            }
+            if (customCssEditor) customCssEditor.setValue('');
+            customCSS = '';
             updateChannelSelect.value = 'stable';
             updateStatus.textContent = '';
             applyAll();
@@ -1077,9 +1310,17 @@
         mainDomDebounce = setTimeout(() => {
             mainDomDebounce = null;
             addCustomButton();
-            applyMainContainerPadding();
+            applyIdePadding();
             if (bgFullscreen) forceMainTransparent();
+            ensurePanelInDom();
         }, 300);
+    }
+
+    function ensurePanelInDom() {
+        if (!panelElement) return;
+        if (!document.body.contains(panelElement)) {
+            document.body.appendChild(panelElement);
+        }
     }
 
     function init() {
@@ -1098,11 +1339,16 @@
             localStorage.setItem("LuoguDisplayBetter-updateChannel", 'stable');
         }
         initVarible();
-        createPanel();
-        if (firstUsed) togglePanel();
         addCustomButton();
         startAdBlockObserver();
         applyAll();
+
+        setTimeout(() => {
+            createPanel();
+            ensurePanelInDom();
+            if (firstUsed) togglePanel();
+        }, 150);
+
         const observer = new MutationObserver(() => {
             scheduleMainDomWork();
         });
