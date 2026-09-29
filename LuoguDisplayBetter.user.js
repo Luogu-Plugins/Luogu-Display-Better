@@ -917,6 +917,13 @@
                 border-color: #000 !important;
                 box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08) !important;
             }
+            #ldb-panel-customCSS .CodeMirror-focused .CodeMirror-selected {
+                background: rgba(0, 0, 0, 0.10) !important;
+            }
+            #ldb-panel-customCSS .CodeMirror-lines {
+                padding: 6px 0 !important;
+            }
+
             #ldb-panel-updateChannel {
                 flex: 1 !important;
                 height: 32px !important;
@@ -1049,6 +1056,34 @@
                 }, 300);
             });
         }
+
+        const customCssContainer = document.getElementById('ldb-panel-customCSS');
+        loadCodeMirror(function(CM) {
+            if (!CM || !customCssContainer) return;
+            customCssEditor = CM(customCssContainer, {
+                value: customCSS,
+                mode: 'css',
+                lineNumbers: true,
+                lineWrapping: true,
+                tabSize: 2,
+                indentUnit: 2,
+                smartIndent: true,
+                autoCloseBrackets: true,
+                matchBrackets: true,
+                styleActiveLine: true,
+                theme: 'default'
+            });
+
+            customCssEditor.on('change', function() {
+                if (customCssSaveTimer) clearTimeout(customCssSaveTimer);
+                customCssSaveTimer = setTimeout(function() {
+                    customCssSaveTimer = null;
+                    if (!customCssEditor) return;
+                    customCSS = customCssEditor.getValue();
+                    saveAndApply("LuoguDisplayBetter-customCSS", customCSS);
+                }, 300);
+            });
+        });
 
         closeBtn.addEventListener('click', () => panelElement.classList.add('hidden'));
 
@@ -1376,6 +1411,13 @@
         if (domPollTimer) return;
         pollDomState();
         domPollTimer = setInterval(pollDomState, DOM_POLL_INTERVAL);
+    }
+
+    function ensurePanelInDom() {
+        if (!panelElement) return;
+        if (!document.body.contains(panelElement)) {
+            document.body.appendChild(panelElement);
+        }
     }
 
     function init() {
