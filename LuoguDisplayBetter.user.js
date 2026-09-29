@@ -1,11 +1,34 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.4.0
+// @version      1.4.1
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
+// @connect      github.com
+// @connect      raw.githubusercontent.com
 // @connect      cdn.jsdelivr.net
+// @connect      fastly.jsdelivr.net
+// @connect      gcore.jsdelivr.net
+// @connect      testingcf.jsdelivr.net
+// @connect      purge.jsdelivr.net
+// @connect      cdn.jsdmirror.com
+// @connect      jsd.cdn.zzko.cn
+// @connect      ghproxy.net
+// @connect      ghfast.top
+// @connect      gh-proxy.com
+// @connect      ghproxy.homeboyc.cn
+// @connect      ghp.ci
+// @connect      moeyy.cn
+// @connect      v6.gh-proxy.org
+// @connect      ghfile.geekertao.top
+// @connect      gh.geekertao.top
+// @connect      github.dpik.top
+// @connect      gh.felicity.ac.cn
+// @connect      gh.llkk.cc
+// @connect      raw.gitmirror.com
+// @connect      raw.staticdn.net
+// @connect      raw.githubusercontents.com
 // @icon         https://fecdn.luogu.com.cn/columba/static.325908fec383795b.logo-single-color.svg
 // @grant        GM_addElement
 // @grant        GM_xmlhttpRequest
@@ -16,6 +39,75 @@
 
 (function() {
     'use strict';
+
+    const STYLE_IDS = {
+        rounded: 'ldb-rounded-style',
+        blur: 'ldb-blur-style',
+        opacity: 'ldb-opacity-style',
+        editorLayout: 'ldb-editor-layout-style',
+        bgFullscreen: 'ldb-bgfullscreen-style',
+        adBlock: 'ldb-adblock-style',
+        customCSS: 'ldb-custom-style',
+        idePadding: 'ldb-ide-padding-style',
+        scrollbar: 'ldb-scrollbar-style'
+    };
+
+    const EDITOR_GAP = 10;
+    const EDITOR_Z_INDEX = 1500;
+    const DOM_POLL_INTERVAL = 500;
+
+    const UPDATE_URLS = {
+        stable: [
+            'https://cdn.jsdmirror.com/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
+            'https://jsd.cdn.zzko.cn/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
+            'https://ghproxy.net/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://ghfast.top/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://gh-proxy.com/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://gh.llkk.cc/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://ghproxy.homeboyc.cn/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://moeyy.cn/gh-proxy/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://v6.gh-proxy.org/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://ghfile.geekertao.top/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://gh.geekertao.top/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://github.dpik.top/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://gh.felicity.ac.cn/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://ghp.ci/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://raw.gitmirror.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://raw.staticdn.net/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://raw.githubusercontents.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js',
+            'https://fastly.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
+            'https://gcore.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
+            'https://testingcf.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
+            'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
+            'https://github.com/Luogu-Plugins/Luogu-Display-Better/raw/main/LuoguDisplayBetter.user.js',
+            'https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/main/LuoguDisplayBetter.user.js'
+        ],
+        latest: [
+            'https://cdn.jsdmirror.com/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js',
+            'https://jsd.cdn.zzko.cn/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js',
+            'https://ghproxy.net/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://ghfast.top/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://gh-proxy.com/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://gh.llkk.cc/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://ghproxy.homeboyc.cn/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://moeyy.cn/gh-proxy/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://v6.gh-proxy.org/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://ghfile.geekertao.top/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://gh.geekertao.top/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://github.dpik.top/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://gh.felicity.ac.cn/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://ghp.ci/https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://raw.gitmirror.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://raw.staticdn.net/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://raw.githubusercontents.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js',
+            'https://fastly.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js',
+            'https://gcore.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js',
+            'https://testingcf.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js',
+            'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js',
+            'https://github.com/Luogu-Plugins/Luogu-Display-Better/raw/dev/LuoguDisplayBetter.user.js',
+            'https://raw.githubusercontent.com/Luogu-Plugins/Luogu-Display-Better/dev/LuoguDisplayBetter.user.js'
+        ]
+    };
 
     let cardborderRad;
     let picborderRad;
@@ -28,143 +120,43 @@
     let customCSS;
     let updateChannel;
 
-    let bgCleanObserver = null;
-    let isObserving = false;
-    let adBlockObserver = null;
+    let panelCreated = false;
+    let panelElement = null;
 
-    let customCssEditor = null;
+    let customCssTextarea = null;
     let customCssSaveTimer = null;
-    let cmLoaded = false;
+    let layoutUpdateTimer = null;
+    let domPollTimer = null;
 
-    const UPDATE_URLS = {
-        stable: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@main/LuoguDisplayBetter.user.js',
-        latest: 'https://cdn.jsdelivr.net/gh/Luogu-Plugins/Luogu-Display-Better@dev/LuoguDisplayBetter.user.js'
-    };
-
-    const CM5_BASE = 'https://cdn.jsdelivr.net/npm/codemirror@5.65.21';
-
-    function gmGet(url) {
-        return new Promise(function(resolve, reject) {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: url,
-                onload: function(r) {
-                    if (r.status >= 200 && r.status < 300) resolve(r.responseText);
-                    else reject(new Error('HTTP ' + r.status + ' for ' + url));
-                },
-                onerror: function() { reject(new Error('Network error: ' + url)); },
-                ontimeout: function() { reject(new Error('Timeout: ' + url)); },
-                timeout: 30000
-            });
-        });
+    function removeStyleElement(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
     }
 
-    function injectStyle(cssText) {
-        GM_addElement(document.head, 'style', { textContent: cssText });
-    }
+    function computeCardColor() {
+        const alpha = opacityValue / 100;
+        const themePage = document.querySelector('.theme-page');
+        let baseColor = '255, 255, 255';
 
-    function injectScript(jsText) {
-        return new Promise(function(resolve, reject) {
-            const blob = new Blob([jsText], { type: 'application/javascript' });
-            const url = URL.createObjectURL(blob);
-            const s = document.createElement('script');
-            s.src = url;
-            s.onload = function() {
-                URL.revokeObjectURL(url);
-                resolve();
-            };
-            s.onerror = function() {
-                URL.revokeObjectURL(url);
-                reject(new Error('script load error'));
-            };
-            (document.head || document.documentElement).appendChild(s);
-        });
-    }
-
-    function loadCodeMirror(callback) {
-        if (cmLoaded) {
-            callback(unsafeWindow.CodeMirror || window.CodeMirror);
-            return;
-        }
-        const win = unsafeWindow || window;
-        if (win._ldbCM5Loading) {
-            win._ldbCM5Loading.push(callback);
-            return;
-        }
-        win._ldbCM5Loading = [callback];
-
-        const files = [
-            { url: CM5_BASE + '/lib/codemirror.css', type: 'css' },
-            { url: CM5_BASE + '/lib/codemirror.js',  type: 'js'  },
-            { url: CM5_BASE + '/mode/css/css.js',    type: 'js'  },
-            { url: CM5_BASE + '/addon/edit/closebrackets.js', type: 'js' },
-            { url: CM5_BASE + '/addon/edit/matchbrackets.js', type: 'js' },
-            { url: CM5_BASE + '/addon/selection/active-line.js', type: 'js' }
-        ];
-
-        const texts = new Array(files.length);
-        let remaining = files.length;
-        let failed = false;
-
-        function done() {
-            remaining--;
-            if (remaining > 0) return;
-
-            const cbs = win._ldbCM5Loading || [];
-            win._ldbCM5Loading = null;
-
-            if (failed) {
-                console.error('[Luogu Display Better] CodeMirror 5 加载失败: 有文件下载失败');
-                cbs.forEach(function(cb) { cb(null); });
-                return;
+        if (themePage) {
+            const native = getComputedStyle(themePage).getPropertyValue('--theme-card-background').trim();
+            if (native) {
+                const m = native.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
+                if (m) baseColor = `${m[1]}, ${m[2]}, ${m[3]}`;
             }
-
-            for (let i = 0; i < files.length; i++) {
-                if (files[i].type === 'css') injectStyle(texts[i]);
-            }
-
-            const jsFiles = files.filter(f => f.type === 'js');
-            const jsTexts = jsFiles.map(f => texts[files.indexOf(f)]);
-
-            (async function() {
-                try {
-                    for (let i = 0; i < jsFiles.length; i++) {
-                        await injectScript(jsTexts[i]);
-                    }
-                } catch (e) {
-                    console.error('[Luogu Display Better] JS 注入异常:', e);
-                    cbs.forEach(function(cb) { cb(null); });
-                    return;
-                }
-
-                const CM = win.CodeMirror || window.CodeMirror;
-                if (!CM) {
-                    console.error('[Luogu Display Better] CodeMirror 未挂载',
-                        'unsafeWindow.CodeMirror =', win.CodeMirror,
-                        'sandbox window.CodeMirror =', window.CodeMirror);
-                    cbs.forEach(function(cb) { cb(null); });
-                    return;
-                }
-
-                cmLoaded = true;
-                cbs.forEach(function(cb) { cb(CM); });
-            })();
         }
-
-        files.forEach(function(f, i) {
-            gmGet(f.url).then(function(text) {
-                texts[i] = text;
-                done();
-            }).catch(function(err) {
-                console.warn('[Luogu Display Better] 加载失败:', f.url, err.message);
-                failed = true;
-                texts[i] = '';
-                done();
-            });
-        });
+        return `rgba(${baseColor}, ${alpha})`;
     }
 
-    function initVarible() {
+    function copyDataAttributes(source, target) {
+        for (const attr of source.attributes) {
+            if (attr.name.startsWith('data-v-')) {
+                target.setAttribute(attr.name, attr.value);
+            }
+        }
+    }
+
+    function loadSettings() {
         cardborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-cardborderRad") ?? 15);
         picborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-picborderRad") ?? 8);
         blurValue = parseFloat(localStorage.getItem("LuoguDisplayBetter-blur") ?? 10);
@@ -177,22 +169,46 @@
         updateChannel = localStorage.getItem("LuoguDisplayBetter-updateChannel") ?? 'stable';
     }
 
-    function applyRounded() {
-        const old = document.getElementById('ldb-rounded-style');
-        if (old) old.remove();
+    function writeDefaultSettings() {
+        const defaults = {
+            "LuoguDisplayBetter-cardborderRad": 15,
+            "LuoguDisplayBetter-picborderRad": 8,
+            "LuoguDisplayBetter-blur": 10,
+            "LuoguDisplayBetter-cardRounded": true,
+            "LuoguDisplayBetter-picRounded": true,
+            "LuoguDisplayBetter-adBlock": false,
+            "LuoguDisplayBetter-bgFullscreen": true,
+            "LuoguDisplayBetter-opacity": 75,
+            "LuoguDisplayBetter-customCSS": '',
+            "LuoguDisplayBetter-updateChannel": 'stable'
+        };
+        for (const [key, value] of Object.entries(defaults)) {
+            localStorage.setItem(key, value);
+        }
+    }
+
+    function saveAndApply(key, value) {
+        localStorage.setItem(key, value);
+        loadSettings();
+        applyAll();
+    }
+
+    function applyRoundedCorners() {
+        removeStyleElement(STYLE_IDS.rounded);
         if (isNaN(cardborderRad) && isNaN(picborderRad)) return;
-        let style = document.createElement('style');
-        style.id = 'ldb-rounded-style';
+
         const cardRadius = cardborderRad + 'px';
         const picRadius = picborderRad + 'px';
-        let css = ``;
+        let css = '';
+
         if (cardRounded) {
             css = `.l-card, .lg-article, .card { border-radius: ${cardRadius} !important; }
                 .swal2-popup { border-radius: ${cardRadius} !important; }
                 .l-form-layout, .am-panel { border-radius: ${cardRadius} !important; }
                 .l-card.comment .author { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
-                .dropdown .center { border-radius: ${cardRadius} !important; }
-                .user-header-top { border-top-left-radius: ${cardRadius}; border-top-right-radius: ${cardRadius}; } .user-header-bottom { border-bottom-left-radius: ${cardRadius}; border-bottom-right-radius: ${cardRadius}; }
+                .dropdown .center, .cs-dialog { border-radius: ${cardRadius} !important; }
+                .user-header-top { border-top-left-radius: ${cardRadius}; border-top-right-radius: ${cardRadius}; }
+                .user-header-bottom { border-bottom-left-radius: ${cardRadius}; border-bottom-right-radius: ${cardRadius}; }
                 .user-nav { border-bottom-left-radius: ${cardRadius}; border-bottom-right-radius: ${cardRadius}; }
                 .test-case { border-radius: 10px; }
                 html.ldb-bgfullscreen .article-banner.article-banner { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
@@ -206,22 +222,29 @@
                     background-color: transparent !important;
                     -webkit-box-shadow: 0 0 0px rgba(0,0,0,0) !important;
                     box-shadow: 0 0 0px rgba(0,0,0,0) !important;
+                }
+                .casket.cs-full-screen {
+                    border-radius: ${cardRadius} !important;
+                    overflow: hidden !important;
                 }`;
         }
         if (picRounded) css += `img { border-radius: ${picRadius} !important; }`;
-        style.innerHTML = css;
-        document.head.append(style);
+
+        const style = document.createElement('style');
+        style.id = STYLE_IDS.rounded;
+        style.textContent = css;
+        document.head.appendChild(style);
     }
 
     function applyCardBlur() {
-        const old = document.getElementById('ldb-blur-style');
-        if (old) old.remove();
-        if (blurValue === undefined || isNaN(blurValue)) return;
-        const style = document.createElement('style');
-        style.id = 'ldb-blur-style';
+        removeStyleElement(STYLE_IDS.blur);
+        if (isNaN(blurValue)) return;
+
         const val = blurValue === 0 ? 'none' : `blur(${blurValue}px)`;
-        let css =
-            `.lg-article, .card, .l-card { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
+
+        const style = document.createElement('style');
+        style.id = STYLE_IDS.blur;
+        style.textContent = `.lg-article, .card, .l-card { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
             .dropdown .center, .popup { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
             .am-comment-hd, .am-comment-bd { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
             .article-banner { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
@@ -237,155 +260,228 @@
             .lfe-dropdown, .ant-dropdown, .ant-select-dropdown,
             .dropdown-menu { overflow: visible !important; }
             .header-layout, .top-bar { z-index: 1000 !important; }`;
-        style.innerHTML = css;
-        document.head.append(style);
+        document.head.appendChild(style);
     }
 
     function applyCardOpacity() {
-        const old = document.getElementById('ldb-opacity-style');
-        if (old) old.remove();
-        if (opacityValue === undefined || isNaN(opacityValue)) return;
+        removeStyleElement(STYLE_IDS.opacity);
+        if (isNaN(opacityValue)) return;
 
-        const alpha = opacityValue / 100;
-
-        const themePage = document.querySelector('.theme-page');
-        let baseColor = '255, 255, 255';
-        if (themePage) {
-            const native = getComputedStyle(themePage)
-                .getPropertyValue('--theme-card-background')
-                .trim();
-            if (native) {
-                const m = native.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
-                if (m) baseColor = `${m[1]}, ${m[2]}, ${m[3]}`;
-            }
-        }
-        const cardColor = `rgba(${baseColor}, ${alpha})`;
+        const cardColor = computeCardColor();
 
         const style = document.createElement('style');
-        style.id = 'ldb-opacity-style';
-        style.innerHTML = `.lg-article, .l-card, .card { background-color: ${cardColor} !important; }
-              .dropdown .center, .popup { background-color: ${cardColor} !important; }
-              .am-comment-hd, .am-comment-bd { background-color: ${cardColor} !important; }
-              nav.lfe-body > div { background-color: ${cardColor} !important; }
-              .user-header-bottom { background-color: transparent !important; }
-              .ide-container { background-color: ${cardColor} !important; }
-              .panel-layout>.panel-divider.with-icon { background-color: transparent !important; }
-              .panel-layout>.panel-divider.dragging { background-color: var(--lfe-color--primary) !important; }
-              .ͼ2 .cm-gutters, .ide-toolbar { background-color: transparent !important; border: 0px solid transparent !important; }
-              input:not([type=range]), textarea, .refined-input { background-color: transparent !important; }
-              .panel-divider, .layout-horizontal>.panel-divider { background-color: transparent !important; }
-              .combo-wrapper>.text, .lform-size-middle.block-item.tag-button,
-              .casket.cs-main, .casket .cs-header, .cs-footer,
-              code[class*=language-], pre[class*=language-], .lfe-code { background-color: transparent !important; }`;
-        document.head.append(style);
+        style.id = STYLE_IDS.opacity;
+        style.textContent = `.lg-article, .l-card, .card { background-color: ${cardColor} !important; }
+            .dropdown .center, .popup { background-color: ${cardColor} !important; }
+            .am-comment-hd, .am-comment-bd { background-color: ${cardColor} !important; }
+            nav.lfe-body > div { background-color: ${cardColor} !important; }
+            .user-header-bottom { background-color: transparent !important; }
+            .ide-container { background-color: ${cardColor} !important; }
+            .panel-layout>.panel-divider.with-icon { background-color: transparent !important; }
+            .panel-layout>.panel-divider.dragging { background-color: var(--lfe-color--primary) !important; }
+            .ͼ2 .cm-gutters, .ide-toolbar { background-color: transparent !important; border: 0px solid transparent !important; }
+            input:not([type=range]), textarea, .refined-input { background-color: transparent !important; }
+            .panel-divider, .layout-horizontal>.panel-divider { background-color: transparent !important; }
+            .combo-wrapper>.text, .lform-size-middle.block-item.tag-button,
+            .casket.cs-main:not(.cs-full-screen),
+            .casket:not(.cs-full-screen) .cs-header,
+            .casket:not(.cs-full-screen) .cs-footer,
+            code[class*=language-], pre[class*=language-], .lfe-code { background-color: transparent !important; }`;
+        document.head.appendChild(style);
 
+        const themePage = document.querySelector('.theme-page');
         if (themePage) {
             themePage.style.setProperty('--theme-card-background', cardColor);
         }
     }
 
-    function forceMainTransparent() {
-        const list = document.querySelectorAll('.main-container > main, main');
-        if (!list.length) return;
-        list.forEach(el => {
-            const bgc = el.style.getPropertyValue('background-color').trim();
-            const bg = el.style.getPropertyValue('background').trim();
-            if (bgc && bgc !== 'transparent' && bgc !== 'rgba(0, 0, 0, 0)') {
-                el.style.setProperty('background-color', 'transparent', 'important');
+    function relocateEditorToBody() {
+        const editors = document.querySelectorAll('.casket.cs-full-screen');
+        if (!editors.length) return false;
+        editors.forEach(el => {
+            if (el.parentElement !== document.body) {
+                document.body.appendChild(el);
             }
-            if (bg && bg !== 'transparent' && bg !== 'none') {
-                el.style.setProperty('background', 'transparent', 'important');
+        });
+        return true;
+    }
+
+    function measureEditorRect() {
+        const topBar = document.querySelector('.top-bar');
+        const topH = topBar ? Math.round(topBar.getBoundingClientRect().height) : 48;
+
+        let sideW = 0;
+        const sidebar = document.querySelector('nav.sidebar');
+        if (sidebar) {
+            const rect = sidebar.getBoundingClientRect();
+            const cs = getComputedStyle(sidebar);
+            if (rect.width > 0 && cs.display !== 'none' && cs.visibility !== 'hidden') {
+                sideW = Math.round(rect.width);
             }
+        }
+
+        const docEl = document.documentElement;
+        const vw = docEl.clientWidth || window.innerWidth;
+        const vh = docEl.clientHeight || window.innerHeight;
+        const gap = EDITOR_GAP;
+
+        return {
+            top: topH + gap,
+            left: sideW + gap,
+            width: Math.max(200, vw - sideW - gap * 2),
+            height: Math.max(200, vh - topH - gap * 2)
+        };
+    }
+
+    function applyFullscreenEditorLayout() {
+        removeStyleElement(STYLE_IDS.editorLayout);
+        if (!relocateEditorToBody()) return;
+
+        const rect = measureEditorRect();
+        const cardColor = computeCardColor();
+
+        const style = document.createElement('style');
+        style.id = STYLE_IDS.editorLayout;
+        style.textContent = `.casket.cs-full-screen,
+            .casket.cs-full-screen .cs-header,
+            .casket.cs-full-screen .cs-footer {
+                background-color: ${cardColor} !important;
+            }
+
+            .casket.cs-main.cs-full-screen {
+                position: fixed !important;
+                top: ${rect.top}px !important;
+                left: ${rect.left}px !important;
+                right: auto !important;
+                bottom: auto !important;
+                width: ${rect.width}px !important;
+                height: ${rect.height}px !important;
+                max-width: none !important;
+                max-height: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: 0 !important;
+                z-index: ${EDITOR_Z_INDEX} !important;
+                display: flex !important;
+                flex-direction: column !important;
+                overflow: hidden !important;
+                box-sizing: border-box !important;
+            }
+
+            .casket.cs-full-screen > * {
+                min-height: 0 !important;
+                min-width: 0 !important;
+                box-sizing: border-box !important;
+            }
+            .casket.cs-full-screen .cs-content {
+                flex: 1 1 auto !important;
+                height: auto !important;
+                overflow: hidden !important;
+            }
+            .casket.cs-full-screen .cs-editor,
+            .casket.cs-full-screen .cs-viewer,
+            .casket.cs-full-screen .cm-editor {
+                min-height: 0 !important;
+                height: 100% !important;
+                overflow: hidden !important;
+            }
+            .casket.cs-full-screen .cm-scroller {
+                overflow-y: auto !important;
+                max-height: 100% !important;
+            }`;
+        document.head.appendChild(style);
+    }
+
+    function scheduleEditorLayoutUpdate() {
+        if (layoutUpdateTimer) return;
+        layoutUpdateTimer = requestAnimationFrame(() => {
+            layoutUpdateTimer = null;
+            applyFullscreenEditorLayout();
         });
     }
 
-    function applyBgFullscreen() {
-        const oldStyle = document.getElementById('ldb-bgfullscreen-style');
-        if (oldStyle) oldStyle.remove();
-        document.documentElement.classList.remove('ldb-bgfullscreen');
-
-        const themePage = document.querySelector('.theme-page');
-
-        if (themePage && themePage._ldbSavedVars) {
-            for (const [key, value] of Object.entries(themePage._ldbSavedVars)) {
-                if (value) {
-                    themePage.style.setProperty(key, value);
-                } else {
-                    themePage.style.removeProperty(key);
-                }
+    function restoreThemeVars(themePage) {
+        if (!themePage || !themePage._ldbSavedVars) return;
+        for (const [key, value] of Object.entries(themePage._ldbSavedVars)) {
+            if (value) {
+                themePage.style.setProperty(key, value);
+            } else {
+                themePage.style.removeProperty(key);
             }
-            delete themePage._ldbSavedVars;
         }
+        delete themePage._ldbSavedVars;
+    }
 
-        if (!bgFullscreen) return;
-
-        let bgImage = null;
-        let bgRepeat = 'no-repeat';
-        let bgSize = 'cover';
-        let bgPosition = 'center';
-        let bgFilter = 'none';
-
+    function resolveBackgroundImage(themePage) {
         if (themePage) {
             const cs = getComputedStyle(themePage);
-
             const img = cs.getPropertyValue('--theme-body-image').trim();
             if (img && img !== 'none') {
                 const urlMatch = img.match(/url\(["']?([^"')]+)["']?\)/);
-                bgImage = urlMatch ? `url("${urlMatch[1]}")` : `url("${img.replace(/^["']|["']$/g, '')}")`;
+                return {
+                    image: urlMatch ? `url("${urlMatch[1]}")` : `url("${img.replace(/^["']|["']$/g, '')}")`,
+                    repeat: cs.getPropertyValue('--theme-body-image-repeat').trim() || 'no-repeat',
+                    size: cs.getPropertyValue('--theme-body-image-size').trim() || 'cover',
+                    position: cs.getPropertyValue('--theme-body-image-position').trim() || 'center',
+                    filter: cs.getPropertyValue('--theme-body-color-filter').trim() || 'none'
+                };
             }
-
-            const repeatVal = cs.getPropertyValue('--theme-body-image-repeat').trim();
-            if (repeatVal) bgRepeat = repeatVal;
-
-            const sizeVal = cs.getPropertyValue('--theme-body-image-size').trim();
-            if (sizeVal) bgSize = sizeVal;
-
-            const posVal = cs.getPropertyValue('--theme-body-image-position').trim();
-            if (posVal) bgPosition = posVal;
-
-            const filterVal = cs.getPropertyValue('--theme-body-color-filter').trim();
-            if (filterVal && filterVal !== 'none') bgFilter = filterVal;
         }
 
-        if (!bgImage) {
-            const themeScript = document.getElementById('luogu-theme');
-            if (themeScript) {
-                try {
-                    const themeData = JSON.parse(themeScript.textContent);
-                    if (themeData?.lBody?.image) {
-                        bgImage = `url("${themeData.lBody.image}")`;
-                        const midOpts = themeData.lBody.midOpts || {};
-                        if (midOpts.size) bgSize = midOpts.size;
-                        if (Array.isArray(midOpts.position) && midOpts.position.length >= 2) {
-                            bgPosition = `${midOpts.position[0]}% ${midOpts.position[1]}%`;
-                        }
-                        if (typeof midOpts.brightness === 'number' && midOpts.brightness !== 0) {
-                            bgFilter = `brightness(${100 + midOpts.brightness}%)`;
-                        }
-                        if (typeof midOpts.notEmpty === 'boolean') {
-                            bgRepeat = midOpts.notEmpty ? 'no-repeat' : 'repeat';
-                        }
+        const themeScript = document.getElementById('luogu-theme');
+        if (themeScript) {
+            try {
+                const data = JSON.parse(themeScript.textContent);
+                if (data && data.lBody && data.lBody.image) {
+                    const midOpts = data.lBody.midOpts || {};
+                    let position = 'center';
+                    if (Array.isArray(midOpts.position) && midOpts.position.length >= 2) {
+                        position = `${midOpts.position[0]}% ${midOpts.position[1]}%`;
                     }
-                } catch (e) {
+                    let filter = 'none';
+                    if (typeof midOpts.brightness === 'number' && midOpts.brightness !== 0) {
+                        filter = `brightness(${100 + midOpts.brightness}%)`;
+                    }
+                    return {
+                        image: `url("${data.lBody.image}")`,
+                        repeat: midOpts.notEmpty === false ? 'repeat' : 'no-repeat',
+                        size: midOpts.size || 'cover',
+                        position: position,
+                        filter: filter
+                    };
                 }
+            } catch (e) {
             }
         }
 
-        if (!bgImage) {
-            const bgDiv = document.querySelector('.header-layout .background');
-            if (bgDiv) {
-                const style = getComputedStyle(bgDiv);
-                const img = style.backgroundImage;
-                if (img && img !== 'none') {
-                    bgImage = img;
-                    if (style.backgroundRepeat) bgRepeat = style.backgroundRepeat;
-                    if (style.backgroundSize) bgSize = style.backgroundSize;
-                    if (style.backgroundPosition) bgPosition = style.backgroundPosition;
-                }
+        const bgDiv = document.querySelector('.header-layout .background');
+        if (bgDiv) {
+            const style = getComputedStyle(bgDiv);
+            if (style.backgroundImage && style.backgroundImage !== 'none') {
+                return {
+                    image: style.backgroundImage,
+                    repeat: style.backgroundRepeat || 'no-repeat',
+                    size: style.backgroundSize || 'cover',
+                    position: style.backgroundPosition || 'center',
+                    filter: 'none'
+                };
             }
         }
 
-        if (!bgImage || bgImage === 'none') return;
+        return null;
+    }
+
+    function applyFullscreenBackground() {
+        removeStyleElement(STYLE_IDS.bgFullscreen);
+        document.documentElement.classList.remove('ldb-bgfullscreen');
+
+        const themePage = document.querySelector('.theme-page');
+        restoreThemeVars(themePage);
+
+        if (!bgFullscreen) return;
+
+        const bg = resolveBackgroundImage(themePage);
+        if (!bg) return;
 
         if (themePage) {
             const varsToOverride = [
@@ -395,11 +491,11 @@
                 '--theme-body-color-filter',
                 '--theme-body-back'
             ];
-            const savedVars = {};
+            const saved = {};
             for (const v of varsToOverride) {
-                savedVars[v] = themePage.style.getPropertyValue(v);
+                saved[v] = themePage.style.getPropertyValue(v);
             }
-            themePage._ldbSavedVars = savedVars;
+            themePage._ldbSavedVars = saved;
 
             themePage.style.setProperty('--theme-body-image', 'none');
             themePage.style.setProperty('--theme-body-color', 'none');
@@ -414,9 +510,8 @@
         document.documentElement.classList.add('ldb-bgfullscreen');
 
         const styleEl = document.createElement('style');
-        styleEl.id = 'ldb-bgfullscreen-style';
-        styleEl.textContent = `
-            html.ldb-bgfullscreen {
+        styleEl.id = STYLE_IDS.bgFullscreen;
+        styleEl.textContent = `html.ldb-bgfullscreen {
                 background: transparent !important;
                 background-image: none !important;
             }
@@ -429,22 +524,16 @@
                 bottom: 0 !important;
                 z-index: -1 !important;
                 pointer-events: none !important;
-                background-image: ${bgImage} !important;
-                background-repeat: ${bgRepeat} !important;
-                background-position: ${bgPosition} !important;
-                background-size: ${bgSize} !important;
-                filter: ${bgFilter} !important;
-                -webkit-filter: ${bgFilter} !important;
+                background-image: ${bg.image} !important;
+                background-repeat: ${bg.repeat} !important;
+                background-position: ${bg.position} !important;
+                background-size: ${bg.size} !important;
+                filter: ${bg.filter} !important;
+                -webkit-filter: ${bg.filter} !important;
             }
-            .header-layout.tiny[data-v-7ddab1d5], .lfe-body[data-v-12f19ddc] {
-                background: transparent !important;
-            }
-            .article-banner + div[data-v-fc349d1c] {
-                background: transparent !important;
-            }
-            html.ldb-bgfullscreen .lcolor-bg-background {
-                background: transparent !important;
-            }
+            .header-layout.tiny[data-v-7ddab1d5], .lfe-body[data-v-12f19ddc] { background: transparent !important; }
+            .article-banner + div[data-v-fc349d1c] { background: transparent !important; }
+            html.ldb-bgfullscreen .lcolor-bg-background { background: transparent !important; }
             html.ldb-bgfullscreen .article-banner.article-banner {
                 background: rgba(245, 245, 245, ${opacityValue / 100}) !important;
             }
@@ -473,21 +562,11 @@
                 background: transparent !important;
                 background-color: transparent !important;
             }
-            html.ldb-bgfullscreen .header-layout .background {
-                opacity: 0;
-            }
-            html.ldb-bgfullscreen .wrapper.wrapped:not(.header-layout) .background {
-                display: none;
-            }
-            html.ldb-bgfullscreen .wrapper.wrapped:not(.header-layout) {
-                background: transparent !important;
-            }
-            html.ldb-bgfullscreen .footer {
-                background: transparent !important;
-            }
-            html.ldb-bgfullscreen .theme-page {
-                background: transparent !important;
-            }
+            html.ldb-bgfullscreen .header-layout .background { opacity: 0; }
+            html.ldb-bgfullscreen .wrapper.wrapped:not(.header-layout) .background { display: none; }
+            html.ldb-bgfullscreen .wrapper.wrapped:not(.header-layout) { background: transparent !important; }
+            html.ldb-bgfullscreen .footer { background: transparent !important; }
+            html.ldb-bgfullscreen .theme-page { background: transparent !important; }
             html.ldb-bgfullscreen .top-bar,
             html.ldb-bgfullscreen .sidebar,
             html.ldb-bgfullscreen .nav-group,
@@ -498,9 +577,7 @@
                 background: transparent !important;
                 background-color: transparent !important;
             }
-            html.ldb-bgfullscreen .top-bar {
-                --theme-navi-back: transparent !important;
-            }
+            html.ldb-bgfullscreen .top-bar { --theme-navi-back: transparent !important; }
             html.ldb-bgfullscreen body::before,
             html.ldb-bgfullscreen body::after,
             html.ldb-bgfullscreen #app::before,
@@ -508,48 +585,52 @@
                 background: none !important;
                 background-image: none !important;
             }
-            html.ldb-bgfullscreen #app {
-                background: transparent !important;
-            }
-        `;
+            html.ldb-bgfullscreen #app { background: transparent !important; }`;
         document.head.appendChild(styleEl);
 
         forceMainTransparent();
     }
 
+    function forceMainTransparent() {
+        const list = document.querySelectorAll('.main-container > main, main');
+        list.forEach(el => {
+            const bgc = el.style.getPropertyValue('background-color').trim();
+            const bg = el.style.getPropertyValue('background').trim();
+            if (bgc && bgc !== 'transparent' && bgc !== 'rgba(0, 0, 0, 0)') {
+                el.style.setProperty('background-color', 'transparent', 'important');
+            }
+            if (bg && bg !== 'transparent' && bg !== 'none') {
+                el.style.setProperty('background', 'transparent', 'important');
+            }
+        });
+    }
+
     function applyAdBlock() {
-        const styleId = 'ldb-adblock-style';
-        const old = document.getElementById(styleId);
-        if (old) old.remove();
-        if (!adBlock) return;
+        const existing = document.getElementById(STYLE_IDS.adBlock);
+        if (!adBlock) {
+            if (existing) existing.remove();
+            return;
+        }
+        if (existing) return;
+
         const style = document.createElement('style');
-        style.id = styleId;
+        style.id = STYLE_IDS.adBlock;
         style.textContent = `.side div[data-v-ce0b4304] { display: none !important; }`;
         document.head.appendChild(style);
     }
 
-    function startAdBlockObserver() {
-        if (adBlockObserver) return;
-        adBlockObserver = new MutationObserver(() => {
-            applyAdBlock();
-        });
-        adBlockObserver.observe(document.body, { childList: true, subtree: true });
-    }
-
     function applyCustomCSS() {
-        const old = document.getElementById('ldb-custom-style');
-        if (old) old.remove();
+        removeStyleElement(STYLE_IDS.customCSS);
         if (!customCSS || customCSS.trim() === '') return;
+
         const style = document.createElement('style');
-        style.id = 'ldb-custom-style';
+        style.id = STYLE_IDS.customCSS;
         style.textContent = customCSS;
         document.head.appendChild(style);
     }
 
-    function applyIdePadding() {
-        const styleId = 'ldb-ide-padding-style';
-        const old = document.getElementById(styleId);
-        if (old) old.remove();
+    function applyIdeLayout() {
+        removeStyleElement(STYLE_IDS.idePadding);
 
         const mainContainer = document.querySelector('.main-container.lside-nav');
         if (!mainContainer) return;
@@ -558,17 +639,14 @@
         const topBar = document.querySelector('.top-bar');
         const topH = topBar ? topBar.getBoundingClientRect().height : 48;
 
-        let css = `
-            .main-container.lside-nav {
+        let css = `.main-container.lside-nav {
                 padding: 10px !important;
                 box-sizing: border-box !important;
                 background: transparent !important;
-            }
-        `;
+            }`;
 
         if (isIdePage) {
-            css += `
-                .main-container.lside-nav {
+            css += `.main-container.lside-nav {
                     height: calc(100vh - ${topH}px) !important;
                     max-height: calc(100vh - ${topH}px) !important;
                     display: flex !important;
@@ -603,17 +681,32 @@
                 .ide-textarea.lfe-code::-webkit-scrollbar-corner {
                     display: none !important;
                     background: transparent !important;
-                }
-            `;
+                }`;
         }
 
         const style = document.createElement('style');
-        style.id = styleId;
+        style.id = STYLE_IDS.idePadding;
         style.textContent = css;
         document.head.appendChild(style);
     }
 
-    function cleanBackground() {
+    function applyScrollbarStyle() {
+        removeStyleElement(STYLE_IDS.scrollbar);
+
+        const style = document.createElement('style');
+        style.id = STYLE_IDS.scrollbar;
+        style.textContent = `* { scrollbar-color: rgb(139, 139, 139) transparent; }
+            nav.sidebar::-webkit-scrollbar,
+            .dropdown::-webkit-scrollbar { width: 8px; }
+            nav.sidebar::-webkit-scrollbar-thumb,
+            .dropdown::-webkit-scrollbar-thumb {
+                background: rgb(139, 139, 139);
+                border-radius: 4px;
+            }`;
+        document.head.appendChild(style);
+    }
+
+    function cleanThemeBackground() {
         document.querySelectorAll('.theme-page').forEach(el => {
             if (el.classList.contains('theme-frosted')) {
                 el.classList.remove('theme-frosted');
@@ -624,111 +717,29 @@
         });
     }
 
-    function ensureObserverCreated() {
-        if (bgCleanObserver) return;
-        bgCleanObserver = new MutationObserver(() => {
-            cleanBackground();
-        });
-    }
-
-    function applyScrollbarStyle() {
-        const styleId = 'ldb-scrollbar-style';
-        const old = document.getElementById(styleId);
-        if (old) old.remove();
-
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-            * {
-                scrollbar-color: rgb(139, 139, 139) transparent;
-            }
-
-            nav.sidebar::-webkit-scrollbar,
-            .dropdown::-webkit-scrollbar {
-                width: 8px;
-            }
-            nav.sidebar::-webkit-scrollbar-thumb,
-            .dropdown::-webkit-scrollbar-thumb {
-                background: rgb(139, 139, 139);
-                border-radius: 4px;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    function toggleBackgroundCleaner() {
-        ensureObserverCreated();
-        cleanBackground();
-        if (!isObserving) {
-            bgCleanObserver.observe(document.documentElement, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['style', 'class']
-            });
-            isObserving = true;
-        }
-    }
-
-    function updatePanelStyle() {
-        if (!panelElement) return;
-        const bv = blurValue != null ? blurValue : 0;
-        const ov = opacityValue != null ? opacityValue : 100;
-        panelElement.style.backdropFilter = `blur(${bv}px)`;
-        panelElement.style.webkitBackdropFilter = `blur(${bv}px)`;
-        panelElement.style.background = `rgba(255, 255, 255, ${ov / 100})`;
-        panelElement.style.color = '#1e1e2f';
-    }
-
-    function applyAll() {
-        applyRounded();
-        applyCardOpacity();
-        applyCardBlur();
-        applyBgFullscreen();
-        applyAdBlock();
-        applyCustomCSS();
-        applyIdePadding();
-        applyScrollbarStyle();
-        toggleBackgroundCleaner();
-        updatePanelStyle();
-    }
-
-    function saveAndApply(key, value) {
-        localStorage.setItem(key, value);
-        initVarible();
-        applyAll();
-    }
-
-    let panelCreated = false;
-    let panelElement = null;
-
-    function createPanel() {
-        if (panelCreated) return;
-        panelCreated = true;
-
-        const panelHTML = `
-            <div id="ldb-panel" class="l-card hidden">
+    function buildPanelHTML() {
+        return `<div id="ldb-panel" class="l-card hidden">
                 <button id="ldb-panel-close" aria-label="关闭">×</button>
                 <h2>插件设置</h2>
                 <h3>卡片模糊度</h3>
                 <p>
-                    <input id="ldb-panel-blur" type="range" min="0" max="30" value="${blurValue != null ? blurValue : 10}" />
-                    <span id="blur-value">${blurValue != null ? blurValue : 10}px</span>
+                    <input id="ldb-panel-blur" type="range" min="0" max="30" value="${blurValue}" />
+                    <span id="blur-value">${blurValue}px</span>
                 </p>
                 <h3>卡片不透明度</h3>
                 <p>
-                    <input id="ldb-panel-opacity" type="range" min="0" max="100" value="${opacityValue != null ? opacityValue : 75}" />
-                    <span id="opacity-value">${opacityValue != null ? opacityValue : 75}%</span>
+                    <input id="ldb-panel-opacity" type="range" min="0" max="100" value="${opacityValue}" />
+                    <span id="opacity-value">${opacityValue}%</span>
                 </p>
                 <h3>卡片圆角曲度</h3>
                 <p>
-                    <input id="ldb-panel-rounded-card" type="range" min="0" max="30" value="${cardborderRad != null ? cardborderRad : 15}" />
-                    <span id="rounded-value-card">${cardborderRad != null ? cardborderRad : 15}px</span>
+                    <input id="ldb-panel-rounded-card" type="range" min="0" max="30" value="${cardborderRad}" />
+                    <span id="rounded-value-card">${cardborderRad}px</span>
                 </p>
                 <h3>图片圆角曲度</h3>
                 <p>
-                    <input id="ldb-panel-rounded-pic" type="range" min="0" max="16" value="${picborderRad != null ? picborderRad : 8}" />
-                    <span id="rounded-value-pic">${picborderRad != null ? picborderRad : 8}px</span>
+                    <input id="ldb-panel-rounded-pic" type="range" min="0" max="16" value="${picborderRad}" />
+                    <span id="rounded-value-pic">${picborderRad}px</span>
                 </p>
                 <p>
                     <input id="ldb-panel-card-rounded" type="checkbox" ${cardRounded ? 'checked' : ''} />
@@ -747,7 +758,7 @@
                     <label for="ldb-panel-adblock">关闭广告</label>
                 </p>
                 <h3>自定义 CSS</h3>
-                <div id="ldb-panel-customCSS"></div>
+                <textarea id="ldb-panel-customCSS" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
                 <h3>更新通道</h3>
                 <p>
                     <select id="ldb-panel-updateChannel">
@@ -760,28 +771,24 @@
                     <button id="ldb-panel-reset">还原设置</button>
                 </p>
                 <p id="ldb-updateStatus"></p>
-            </div>
-        `;
+            </div>`;
+    }
 
-        const container = document.createElement('div');
-        container.innerHTML = panelHTML;
-        panelElement = container.firstElementChild;
-        document.body.appendChild(panelElement);
-
-        const css = `
-            #ldb-panel {
+    function injectPanelStyle() {
+        const style = document.createElement('style');
+        style.textContent = `#ldb-panel {
                 position: fixed !important;
                 right: 35px !important;
                 top: 50% !important;
                 transform: translateY(-50%) !important;
                 padding: 28px 24px 24px !important;
-                background: rgba(255, 255, 255, ${(opacityValue != null ? opacityValue : 75) / 100}) !important;
-                backdrop-filter: blur(${blurValue != null ? blurValue : 10}px) !important;
-                -webkit-backdrop-filter: blur(${blurValue != null ? blurValue : 10}px) !important;
+                background: rgba(255, 255, 255, ${opacityValue / 100}) !important;
+                backdrop-filter: blur(${blurValue}px) !important;
+                -webkit-backdrop-filter: blur(${blurValue}px) !important;
                 border-radius: 24px !important;
                 box-shadow: 0 12px 40px rgba(0,0,0,0.15) !important;
                 color: #1e1e2f !important;
-                transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease !important;
+                transition: opacity .3s ease, visibility .3s ease, transform .3s ease !important;
                 z-index: 2147483000 !important;
                 box-sizing: border-box !important;
                 width: min(400px, 50vw) !important;
@@ -789,7 +796,7 @@
                 max-height: calc(100vh - 40px) !important;
                 overflow-y: auto !important;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                            "PingFang SC", "Microsoft YaHei", sans-serif !important;
+                             "PingFang SC", "Microsoft YaHei", sans-serif !important;
                 font-size: 14px !important;
                 line-height: 1.4 !important;
                 text-align: left !important;
@@ -824,18 +831,14 @@
                 justify-content: center !important;
                 overflow: hidden !important;
                 cursor: pointer !important;
-                transition: background 0.2s, transform 0.2s !important;
+                transition: background .2s, transform .2s !important;
             }
-            #ldb-panel-close:hover  { background: #e04345 !important; transform: scale(1.06) !important; }
+            #ldb-panel-close:hover { background: #e04345 !important; transform: scale(1.06) !important; }
             #ldb-panel-close:active { transform: scale(0.92) !important; }
-
             #ldb-panel h2 { margin: 0 0 16px 0 !important; font-size: 22px !important;
-                            font-weight: 600 !important; color: #2c3e50 !important;
-                            line-height: 1.3 !important; }
+                            font-weight: 600 !important; color: #2c3e50 !important; line-height: 1.3 !important; }
             #ldb-panel h3 { margin: 18px 0 6px 0 !important; font-size: 15px !important;
-                            font-weight: 500 !important; color: #34495e !important;
-                            line-height: 1.3 !important; }
-
+                            font-weight: 500 !important; color: #34495e !important; line-height: 1.3 !important; }
             #ldb-panel p {
                 margin: 6px 0 12px 0 !important;
                 padding: 0 !important;
@@ -867,7 +870,6 @@
                 color: #1e1e2f !important;
                 vertical-align: middle !important;
             }
-
             #ldb-panel input[type="range"] {
                 flex: 1 !important;
                 accent-color: #000 !important;
@@ -880,53 +882,41 @@
             }
             #ldb-panel input[type="range"]::-webkit-slider-thumb {
                 -webkit-appearance: none !important;
-                width: 16px !important; height: 16px !important;
-                border-radius: 50% !important; background: #000 !important;
+                width: 16px !important;
+                height: 16px !important;
+                border-radius: 50% !important;
+                background: #000 !important;
                 box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
                 cursor: pointer !important;
             }
-
             #ldb-panel-customCSS {
+                display: block !important;
                 width: 100% !important;
-                height: clamp(80px, calc(100vh - 720px), 120px) !important;
+                height: clamp(100px, calc(100vh - 700px), 160px) !important;
+                margin: 0 !important;
+                padding: 8px 10px !important;
                 border: 1px solid #ccc !important;
                 border-radius: 4px !important;
                 box-sizing: border-box !important;
-                overflow: hidden !important;
-                background: rgba(255, 255, 255, 0.9) !important;
-            }
-            #ldb-panel-customCSS .CodeMirror {
-                height: 100% !important;
-                font-family: Consolas, "Courier New", monospace !important;
-                font-size: 13px !important;
-                line-height: 1.5 !important;
                 background: transparent !important;
                 color: #1e1e2f !important;
+                font-family: var(--lfe-code-font, Monospace) !important;
+                font-size: 13px !important;
+                line-height: 1.5 !important;
+                resize: none !important;
+                -webkit-appearance: none !important;
+                overflow: auto !important;
+                outline: none !important;
+                tab-size: 2 !important;
+                -moz-tab-size: 2 !important;
+                white-space: pre !important;
+                transition: border-color .2s, box-shadow .2s !important;
             }
-            #ldb-panel-customCSS .CodeMirror-gutters {
-                background: transparent !important;
-                border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+            #ldb-panel-customCSS::placeholder { color: #9aa4ad !important; }
+            #ldb-panel-customCSS:focus {
+                border-color: #000 !important;
+                box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08) !important;
             }
-            #ldb-panel-customCSS .CodeMirror-linenumber {
-                color: #9aa4ad !important;
-            }
-            #ldb-panel-customCSS .CodeMirror-cursor {
-                border-left: 1px solid #1e1e2f !important;
-            }
-            #ldb-panel-customCSS .CodeMirror-selected,
-            #ldb-panel-customCSS .CodeMirror-selectedtext {
-                background: rgba(0, 0, 0, 0.08) !important;
-            }
-            #ldb-panel-customCSS .CodeMirror-activeline-background {
-                background: rgba(0, 0, 0, 0.03) !important;
-            }
-            #ldb-panel-customCSS .CodeMirror-focused .CodeMirror-selected {
-                background: rgba(0, 0, 0, 0.10) !important;
-            }
-            #ldb-panel-customCSS .CodeMirror-lines {
-                padding: 6px 0 !important;
-            }
-
             #ldb-panel-updateChannel {
                 flex: 1 !important;
                 height: 32px !important;
@@ -940,11 +930,9 @@
                 box-sizing: border-box !important;
                 cursor: pointer !important;
                 outline: none !important;
-                transition: border-color 0.2s, box-shadow 0.2s !important;
+                transition: border-color .2s, box-shadow .2s !important;
             }
-            #ldb-panel-updateChannel:hover {
-                border-color: #999 !important;
-            }
+            #ldb-panel-updateChannel:hover { border-color: #999 !important; }
             #ldb-panel-updateChannel:focus {
                 border-color: #000 !important;
                 box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08) !important;
@@ -963,9 +951,9 @@
                 box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
                 line-height: 1.4 !important;
                 box-sizing: border-box !important;
-                transition: background 0.2s, transform 0.1s !important;
+                transition: background .2s, transform .1s !important;
             }
-            #ldb-panel-checkUpdate:hover  { background: #333 !important; }
+            #ldb-panel-checkUpdate:hover { background: #333 !important; }
             #ldb-panel-checkUpdate:active { transform: scale(0.96) !important; }
             #ldb-panel-reset {
                 display: inline-block !important;
@@ -981,9 +969,9 @@
                 box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
                 line-height: 1.4 !important;
                 box-sizing: border-box !important;
-                transition: background 0.2s, transform 0.1s !important;
+                transition: background .2s, transform .1s !important;
             }
-            #ldb-panel-reset:hover  { background: #d5dbe0 !important; }
+            #ldb-panel-reset:hover { background: #d5dbe0 !important; }
             #ldb-panel-reset:active { transform: scale(0.96) !important; }
             #ldb-panel #ldb-updateStatus {
                 display: block !important;
@@ -995,11 +983,7 @@
                 text-align: left !important;
                 word-break: break-all !important;
             }
-            #ldb-panel #ldb-updateStatus:empty {
-                display: none !important;
-                margin: 0 !important;
-            }
-
+            #ldb-panel #ldb-updateStatus:empty { display: none !important; margin: 0 !important; }
             #blur-value, #opacity-value, #rounded-value-card, #rounded-value-pic {
                 display: inline-block !important;
                 width: 45px !important;
@@ -1009,64 +993,62 @@
             }
             #ldb-panel a { color: #0d3d41 !important; text-decoration: none !important; }
             #ldb-panel a:hover { text-decoration: underline !important; }
-
             @media (max-width: 900px) {
                 #ldb-panel { width: 50vw !important; right: 12px !important; }
             }
             @media (max-width: 400px) {
                 #ldb-panel { width: calc(100vw - 20px) !important; right: 10px !important;
-                            padding: 20px 16px !important; }
-            }
-        `;
-        const styleEl = document.createElement('style');
-        styleEl.textContent = css;
-        document.head.appendChild(styleEl);
+                             padding: 20px 16px !important; }
+            }`;
+        document.head.appendChild(style);
+    }
 
-        const cardroundedSlider = document.getElementById('ldb-panel-rounded-card');
-        const cardroundedDisplay = document.getElementById('rounded-value-card');
-        const picroundedSlider = document.getElementById('ldb-panel-rounded-pic');
-        const picroundedDisplay = document.getElementById('rounded-value-pic');
-        const closeBtn = document.getElementById('ldb-panel-close');
-        const blurSlider = document.getElementById('ldb-panel-blur');
-        const blurDisplay = document.getElementById('blur-value');
-        const opacitySlider = document.getElementById('ldb-panel-opacity');
-        const opacityDisplay = document.getElementById('opacity-value');
-        const cardRoundedCb = document.getElementById('ldb-panel-card-rounded');
-        const picRoundedCb = document.getElementById('ldb-panel-pic-rounded');
-        const bgFullscreenCb = document.getElementById('ldb-panel-bgfullscreen');
-        const adBlockCb = document.getElementById('ldb-panel-adblock');
-        const updateChannelSelect = document.getElementById('ldb-panel-updateChannel');
-        const checkUpdateBtn = document.getElementById('ldb-panel-checkUpdate');
-        const updateStatus = document.getElementById('ldb-updateStatus');
-        const resetBtn = document.getElementById('ldb-panel-reset');
+    function applyEditorFont() {
+        if (!customCssTextarea) return;
+        let fontFamily = '';
+        try {
+            fontFamily = getComputedStyle(document.body).getPropertyValue('--lfe-code-font').trim();
+        } catch (e) {
+        }
+        customCssTextarea.style.setProperty('font-family', fontFamily || 'Monospace', 'important');
+    }
 
-        const customCssContainer = document.getElementById('ldb-panel-customCSS');
-        loadCodeMirror(function(CM) {
-            if (!CM || !customCssContainer) return;
-            customCssEditor = CM(customCssContainer, {
-                value: customCSS,
-                mode: 'css',
-                lineNumbers: true,
-                lineWrapping: true,
-                tabSize: 2,
-                indentUnit: 2,
-                smartIndent: true,
-                autoCloseBrackets: true,
-                matchBrackets: true,
-                styleActiveLine: true,
-                theme: 'default'
-            });
+    function bindPanelEvents() {
+        const $ = id => document.getElementById(id);
 
-            customCssEditor.on('change', function() {
+        const cardroundedSlider = $('ldb-panel-rounded-card');
+        const cardroundedDisplay = $('rounded-value-card');
+        const picroundedSlider = $('ldb-panel-rounded-pic');
+        const picroundedDisplay = $('rounded-value-pic');
+        const closeBtn = $('ldb-panel-close');
+        const blurSlider = $('ldb-panel-blur');
+        const blurDisplay = $('blur-value');
+        const opacitySlider = $('ldb-panel-opacity');
+        const opacityDisplay = $('opacity-value');
+        const cardRoundedCb = $('ldb-panel-card-rounded');
+        const picRoundedCb = $('ldb-panel-pic-rounded');
+        const bgFullscreenCb = $('ldb-panel-bgfullscreen');
+        const adBlockCb = $('ldb-panel-adblock');
+        const updateChannelSel = $('ldb-panel-updateChannel');
+        const checkUpdateBtn = $('ldb-panel-checkUpdate');
+        const updateStatus = $('ldb-updateStatus');
+        const resetBtn = $('ldb-panel-reset');
+
+        customCssTextarea = $('ldb-panel-customCSS');
+        applyEditorFont();
+
+        if (customCssTextarea) {
+            customCssTextarea.value = customCSS || '';
+            customCssTextarea.addEventListener('input', function() {
                 if (customCssSaveTimer) clearTimeout(customCssSaveTimer);
                 customCssSaveTimer = setTimeout(function() {
                     customCssSaveTimer = null;
-                    if (!customCssEditor) return;
-                    customCSS = customCssEditor.getValue();
+                    if (!customCssTextarea) return;
+                    customCSS = customCssTextarea.value;
                     saveAndApply("LuoguDisplayBetter-customCSS", customCSS);
                 }, 300);
             });
-        });
+        }
 
         closeBtn.addEventListener('click', () => panelElement.classList.add('hidden'));
 
@@ -1074,17 +1056,14 @@
             blurDisplay.textContent = this.value + 'px';
             saveAndApply("LuoguDisplayBetter-blur", this.value);
         });
-
         opacitySlider.addEventListener('input', function() {
             opacityDisplay.textContent = this.value + '%';
             saveAndApply("LuoguDisplayBetter-opacity", this.value);
         });
-
         cardroundedSlider.addEventListener('input', function() {
             cardroundedDisplay.textContent = this.value + 'px';
             saveAndApply("LuoguDisplayBetter-cardborderRad", this.value);
         });
-
         picroundedSlider.addEventListener('input', function() {
             picroundedDisplay.textContent = this.value + 'px';
             saveAndApply("LuoguDisplayBetter-picborderRad", this.value);
@@ -1093,20 +1072,17 @@
         cardRoundedCb.addEventListener('change', function() {
             saveAndApply("LuoguDisplayBetter-cardRounded", this.checked);
         });
-
         picRoundedCb.addEventListener('change', function() {
             saveAndApply("LuoguDisplayBetter-picRounded", this.checked);
         });
-
         bgFullscreenCb.addEventListener('change', function() {
             saveAndApply("LuoguDisplayBetter-bgFullscreen", this.checked);
         });
-
         adBlockCb.addEventListener('change', function() {
             saveAndApply("LuoguDisplayBetter-adBlock", this.checked);
         });
 
-        updateChannelSelect.addEventListener('change', function() {
+        updateChannelSel.addEventListener('change', function() {
             if (updateStatus._ldbTimer) {
                 clearTimeout(updateStatus._ldbTimer);
                 updateStatus._ldbTimer = null;
@@ -1124,17 +1100,9 @@
                 clearTimeout(updateStatus._ldbTimer);
                 updateStatus._ldbTimer = null;
             }
-            localStorage.setItem("LuoguDisplayBetter-cardborderRad", 15);
-            localStorage.setItem("LuoguDisplayBetter-picborderRad", 8);
-            localStorage.setItem("LuoguDisplayBetter-blur", 10);
-            localStorage.setItem("LuoguDisplayBetter-cardRounded", true);
-            localStorage.setItem("LuoguDisplayBetter-picRounded", true);
-            localStorage.setItem("LuoguDisplayBetter-adBlock", false);
-            localStorage.setItem("LuoguDisplayBetter-bgFullscreen", true);
-            localStorage.setItem("LuoguDisplayBetter-opacity", 75);
-            localStorage.setItem("LuoguDisplayBetter-customCSS", '');
-            localStorage.setItem("LuoguDisplayBetter-updateChannel", 'stable');
-            initVarible();
+            writeDefaultSettings();
+            loadSettings();
+
             blurSlider.value = blurValue;
             cardroundedSlider.value = cardborderRad;
             picroundedSlider.value = picborderRad;
@@ -1147,13 +1115,14 @@
             picRoundedCb.checked = true;
             bgFullscreenCb.checked = true;
             adBlockCb.checked = false;
+
             if (customCssSaveTimer) {
                 clearTimeout(customCssSaveTimer);
                 customCssSaveTimer = null;
             }
-            if (customCssEditor) customCssEditor.setValue('');
+            if (customCssTextarea) customCssTextarea.value = '';
             customCSS = '';
-            updateChannelSelect.value = 'stable';
+            updateChannelSel.value = 'stable';
             updateStatus.textContent = '';
             applyAll();
         });
@@ -1165,54 +1134,98 @@
         });
     }
 
-    function checkForUpdate(statusEl) {
-        if (statusEl._ldbTimer) {
-            clearTimeout(statusEl._ldbTimer);
-            statusEl._ldbTimer = null;
+    function createSettingsPanel() {
+        if (panelCreated) return;
+        panelCreated = true;
+
+        const container = document.createElement('div');
+        container.innerHTML = buildPanelHTML();
+        panelElement = container.firstElementChild;
+        document.body.appendChild(panelElement);
+
+        injectPanelStyle();
+        bindPanelEvents();
+    }
+
+    function updatePanelStyle() {
+        if (!panelElement) return;
+        const bv = blurValue != null ? blurValue : 0;
+        const ov = opacityValue != null ? opacityValue : 100;
+        panelElement.style.backdropFilter = `blur(${bv}px)`;
+        panelElement.style.webkitBackdropFilter = `blur(${bv}px)`;
+        panelElement.style.background = `rgba(255, 255, 255, ${ov / 100})`;
+        panelElement.style.color = '#1e1e2f';
+    }
+
+    function toggleSettingsPanel() {
+        if (!panelElement) return;
+        panelElement.classList.toggle('hidden');
+    }
+
+    function ensurePanelInDom() {
+        if (!panelElement) return;
+        if (!document.body.contains(panelElement)) {
+            document.body.appendChild(panelElement);
         }
-        const url = UPDATE_URLS[updateChannel];
-        if (!url) {
-            statusEl.textContent = '未知通道';
+    }
+
+    function addSettingsNavButton() {
+        if (document.querySelector('.sidebar.lside.bar.hide.nav-scrollbar')) {
+            if (document.getElementById('stylePluginSettingButton')) return;
+
+            const ul = document.querySelector('.nav-group.on-expand ul[data-v-a119941e]');
+            if (!ul) return;
+
+            const sampleLi = ul.querySelector('li');
+            if (!sampleLi) return;
+
+            const newLi = document.createElement('li');
+            copyDataAttributes(sampleLi, newLi);
+            newLi.setAttribute('title', '美化插件设置');
+
+            const newA = document.createElement('a');
+            const sampleA = sampleLi.querySelector('a');
+            if (sampleA) {
+                copyDataAttributes(sampleA, newA);
+                newA.className = sampleA.className;
+                newA.setAttribute('disabled', sampleA.getAttribute('disabled') || 'false');
+            }
+            newA.href = 'javascript:void(0);';
+            newA.id = 'stylePluginSettingButton';
+
+            const span = document.createElement('span');
+            const sampleSpan = sampleLi.querySelector('span.title');
+            if (sampleSpan) {
+                copyDataAttributes(sampleSpan, span);
+                span.className = sampleSpan.className;
+            }
+            span.textContent = '美化插件设置';
+
+            newA.appendChild(document.createComment(''));
+            newA.appendChild(span);
+            newLi.appendChild(newA);
+            newA.addEventListener('click', e => { e.preventDefault(); toggleSettingsPanel(); });
+
+            ul.appendChild(newLi);
             return;
         }
-        statusEl.textContent = '检查中...';
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: url,
-            headers: {
-                'Cache-Control': 'no-cache'
-            },
-            onload: function(response) {
-                if (response.status !== 200) {
-                    statusEl.textContent = '获取失败 (' + response.status + ')';
-                    return;
-                }
-                const match = response.responseText.match(/\/\/\s*@version\s+([\d.]+)/);
-                if (!match) {
-                    statusEl.textContent = '无法解析版本';
-                    return;
-                }
-                const remoteVersion = match[1];
-                const localVersion = GM_info.script.version;
-                if (compareVersions(remoteVersion, localVersion) > 0) {
-                    statusEl.innerHTML = '发现新版本 v' + remoteVersion + '，' +
-                        '<a href="' + url + '" target="_blank" style="color:#0d6efd;text-decoration:underline;cursor:pointer;">点击安装</a>';
-                } else {
-                    statusEl.textContent = '已是最新版本 v' + localVersion;
-                    statusEl._ldbTimer = setTimeout(function() {
-                        statusEl.textContent = '';
-                        statusEl._ldbTimer = null;
-                    }, 2000);
-                }
-            },
-            onerror: function() {
-                statusEl.textContent = '网络请求失败';
-            },
-            ontimeout: function() {
-                statusEl.textContent = '请求超时';
-            },
-            timeout: 10000
-        });
+
+        const appsContainer = document.querySelector('.apps');
+        if (!appsContainer) return;
+        if (appsContainer.querySelector('#stylePluginSettingButton')) return;
+
+        const sample = appsContainer.querySelector('a');
+        if (!sample) return;
+
+        const newLink = document.createElement('a');
+        copyDataAttributes(sample, newLink);
+        newLink.setAttribute('colorscheme', sample.getAttribute('colorscheme') || 'none');
+        newLink.className = sample.className;
+        newLink.href = 'javascript:void(0);';
+        newLink.innerText = '美化插件设置';
+        newLink.id = 'stylePluginSettingButton';
+        newLink.addEventListener('click', e => { e.preventDefault(); toggleSettingsPanel(); });
+        appsContainer.appendChild(newLink);
     }
 
     function compareVersions(a, b) {
@@ -1227,134 +1240,182 @@
         return 0;
     }
 
-    function togglePanel() {
-        if (!panelElement) return;
-        panelElement.classList.toggle('hidden');
-    }
-
-    function addCustomButton() {
-        if (document.querySelector(`.sidebar.lside.bar.hide.nav-scrollbar`)) {
-            const ul = document.querySelector('.nav-group.on-expand ul[data-v-a119941e]');
-            if (!ul) return;
-            if (ul.querySelector(`#stylePluginSettingButton`)) return;
-            const sampleLi = ul.querySelector('li');
-            if (!sampleLi) return;
-            const newLi = document.createElement('li');
-            for (const attr of sampleLi.attributes) {
-                if (attr.name.startsWith('data-v-')) {
-                    newLi.setAttribute(attr.name, attr.value);
-                }
-            }
-            newLi.setAttribute('title', '美化插件设置');
-            const newA = document.createElement('a');
-            const sampleA = sampleLi.querySelector('a');
-            if (sampleA) {
-                for (const attr of sampleA.attributes) {
-                    if (attr.name.startsWith('data-v-')) {
-                        newA.setAttribute(attr.name, attr.value);
-                    }
-                }
-                newA.className = sampleA.className;
-                newA.setAttribute('disabled', sampleA.getAttribute('disabled') || 'false');
-            }
-            newA.href = 'javascript:void(0);';
-            newA.id = 'stylePluginSettingButton';
-            const span = document.createElement('span');
-            const sampleSpan = sampleLi.querySelector('span.title');
-            if (sampleSpan) {
-                for (const attr of sampleSpan.attributes) {
-                    if (attr.name.startsWith('data-v-')) {
-                        span.setAttribute(attr.name, attr.value);
-                    }
-                }
-                span.className = sampleSpan.className;
-            }
-            span.textContent = '美化插件设置';
-            newA.appendChild(document.createComment(''));
-            newA.appendChild(span);
-            newLi.appendChild(newA);
-            newA.addEventListener('click', function(event) {
-                event.preventDefault();
-                togglePanel();
-            });
-            ul.appendChild(newLi);
+    function purgeJsdelivr(rawUrl, callback) {
+        if (!rawUrl.includes('jsdelivr.net')) {
+            callback();
             return;
         }
 
-        const appsContainer = document.querySelector('.apps');
-        if (!appsContainer) return;
-        if (appsContainer.querySelector(`#stylePluginSettingButton`)) return;
-        const sample = appsContainer.querySelector('a');
-        if (!sample) return;
-        const newLink = document.createElement('a');
-        for (const attr of sample.attributes) {
-            if (attr.name.startsWith('data-v-')) {
-                newLink.setAttribute(attr.name, attr.value);
+        let purgeUrl = rawUrl
+            .replace('cdn.jsdelivr.net', 'purge.jsdelivr.net')
+            .replace('fastly.jsdelivr.net', 'purge.jsdelivr.net')
+            .replace('gcore.jsdelivr.net', 'purge.jsdelivr.net')
+            .replace('testingcf.jsdelivr.net', 'purge.jsdelivr.net');
+
+        if (purgeUrl === rawUrl) {
+            callback();
+            return;
+        }
+
+        let called = false;
+        const done = () => {
+            if (called) return;
+            called = true;
+            callback();
+        };
+
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: purgeUrl,
+            timeout: 5000,
+            onload: done,
+            onerror: done,
+            ontimeout: done
+        });
+    }
+
+    function checkForUpdate(statusEl) {
+        if (statusEl._ldbTimer) {
+            clearTimeout(statusEl._ldbTimer);
+            statusEl._ldbTimer = null;
+        }
+
+        const urls = UPDATE_URLS[updateChannel];
+        if (!urls || !urls.length) {
+            statusEl.textContent = '未知通道';
+            return;
+        }
+
+        const localVersion = GM_info.script.version;
+        let index = 0;
+
+        function fetchUrl(rawUrl) {
+            const sep = rawUrl.includes('?') ? '&' : '?';
+            const url = `${rawUrl}${sep}t=${Date.now()}`;
+
+            statusEl.textContent = `检查中... (${index}/${urls.length})`;
+
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                headers: { 'Cache-Control': 'no-cache' },
+                timeout: 10000,
+                onload(response) {
+                    if (response.status !== 200) {
+                        tryNext();
+                        return;
+                    }
+                    const match = response.responseText.match(/\/\/\s*@version\s+([\d.]+)/);
+                    if (!match) {
+                        tryNext();
+                        return;
+                    }
+                    const remoteVersion = match[1];
+                    if (compareVersions(remoteVersion, localVersion) > 0) {
+                        statusEl.innerHTML = '发现新版本 v' + remoteVersion + '，' +
+                            '<a href="' + rawUrl + '" target="_blank" style="color:#0d6efd;text-decoration:underline;cursor:pointer;">点击安装</a>';
+                    } else {
+                        statusEl.textContent = '已是最新版本 v' + localVersion;
+                        statusEl._ldbTimer = setTimeout(() => {
+                            statusEl.textContent = '';
+                            statusEl._ldbTimer = null;
+                        }, 2000);
+                    }
+                },
+                onerror: tryNext,
+                ontimeout: tryNext
+            });
+        }
+
+        function tryNext() {
+            if (index >= urls.length) {
+                statusEl.textContent = '网络请求失败';
+                return;
+            }
+
+            const rawUrl = urls[index++];
+
+            if (rawUrl.includes('jsdelivr.net')) {
+                statusEl.textContent = `刷新缓存中... (${index}/${urls.length})`;
+                purgeJsdelivr(rawUrl, () => fetchUrl(rawUrl));
+            } else {
+                fetchUrl(rawUrl);
             }
         }
-        newLink.setAttribute('colorscheme', sample.getAttribute('colorscheme') || 'none');
-        newLink.className = sample.className;
-        newLink.href = 'javascript:void(0);';
-        newLink.innerText = '美化插件设置';
-        newLink.id = 'stylePluginSettingButton';
-        newLink.addEventListener('click', function(event) {
-            event.preventDefault();
-            togglePanel();
-        });
-        appsContainer.appendChild(newLink);
+
+        tryNext();
     }
 
-    let mainDomDebounce = null;
-    function scheduleMainDomWork() {
-        if (mainDomDebounce) return;
-        mainDomDebounce = setTimeout(() => {
-            mainDomDebounce = null;
-            addCustomButton();
-            applyIdePadding();
-            if (bgFullscreen) forceMainTransparent();
-            ensurePanelInDom();
-        }, 300);
+    function applyAll() {
+        applyRoundedCorners();
+        applyCardBlur();
+        applyCardOpacity();
+        applyFullscreenBackground();
+        applyFullscreenEditorLayout();
+        applyAdBlock();
+        applyCustomCSS();
+        applyIdeLayout();
+        applyScrollbarStyle();
+        cleanThemeBackground();
+        updatePanelStyle();
     }
 
-    function ensurePanelInDom() {
-        if (!panelElement) return;
-        if (!document.body.contains(panelElement)) {
-            document.body.appendChild(panelElement);
+    function pollDomState() {
+        addSettingsNavButton();
+        ensurePanelInDom();
+
+        if (relocateEditorToBody()) {
+            scheduleEditorLayoutUpdate();
         }
+
+        applyAdBlock();
+        cleanThemeBackground();
+    }
+
+    function startDomPolling() {
+        if (domPollTimer) return;
+        pollDomState();
+        domPollTimer = setInterval(pollDomState, DOM_POLL_INTERVAL);
     }
 
     function init() {
         const firstUsed = localStorage.getItem("LuoguDisplayBetter-FirstUsed") == null;
         if (firstUsed) {
             localStorage.setItem("LuoguDisplayBetter-FirstUsed", false);
-            localStorage.setItem("LuoguDisplayBetter-cardborderRad", 15);
-            localStorage.setItem("LuoguDisplayBetter-picborderRad", 8);
-            localStorage.setItem("LuoguDisplayBetter-blur", 10);
-            localStorage.setItem("LuoguDisplayBetter-cardRounded", true);
-            localStorage.setItem("LuoguDisplayBetter-picRounded", true);
-            localStorage.setItem("LuoguDisplayBetter-adBlock", false);
-            localStorage.setItem("LuoguDisplayBetter-bgFullscreen", true);
-            localStorage.setItem("LuoguDisplayBetter-opacity", 75);
-            localStorage.setItem("LuoguDisplayBetter-customCSS", '');
-            localStorage.setItem("LuoguDisplayBetter-updateChannel", 'stable');
+            writeDefaultSettings();
         }
-        initVarible();
-        addCustomButton();
-        startAdBlockObserver();
+
+        loadSettings();
+        addSettingsNavButton();
         applyAll();
 
         setTimeout(() => {
-            createPanel();
+            createSettingsPanel();
             ensurePanelInDom();
-            if (firstUsed) togglePanel();
+            if (firstUsed) toggleSettingsPanel();
         }, 150);
 
-        const observer = new MutationObserver(() => {
-            scheduleMainDomWork();
+        startDomPolling();
+
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(() => {
+                if (document.querySelector('.casket.cs-full-screen')) {
+                    scheduleEditorLayoutUpdate();
+                }
+            });
+            ro.observe(document.documentElement);
+        }
+
+        window.addEventListener('resize', () => {
+            if (document.querySelector('.casket.cs-full-screen')) {
+                scheduleEditorLayoutUpdate();
+            }
         });
-        observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
