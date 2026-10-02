@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.4.1
+// @version      1.4.2
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
+// @match        *://www.luogu.com/*
 // @connect      github.com
 // @connect      raw.githubusercontent.com
 // @connect      cdn.jsdelivr.net
@@ -54,7 +55,8 @@
 
     const EDITOR_GAP = 10;
     const EDITOR_Z_INDEX = 1500;
-    const DOM_POLL_INTERVAL = 500;
+    const DOM_POLL_INTERVAL = 200;
+    const SETTINGS_PANEL_DELAY = 150;
 
     const UPDATE_URLS = {
         stable: [
@@ -109,24 +111,18 @@
         ]
     };
 
-    let cardborderRad;
-    let picborderRad;
-    let blurValue;
-    let opacityValue;
-    let cardRounded;
-    let picRounded;
-    let bgFullscreen;
-    let adBlock;
-    let customCSS;
-    let updateChannel;
+    let cardborderRad, picborderRad, blurValue, opacityValue;
+    let cardRounded, picRounded, bgFullscreen, adBlock, customCSS, updateChannel;
 
     let panelCreated = false;
     let panelElement = null;
-
     let customCssTextarea = null;
+
     let customCssSaveTimer = null;
     let layoutUpdateTimer = null;
     let domPollTimer = null;
+    let bgUpdateRaf = null;
+    let bgObserver = null;
 
     function removeStyleElement(id) {
         const el = document.getElementById(id);
@@ -154,6 +150,18 @@
                 target.setAttribute(attr.name, attr.value);
             }
         }
+    }
+
+    function compareVersions(a, b) {
+        const pa = a.split('.').map(Number);
+        const pb = b.split('.').map(Number);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+            const na = pa[i] || 0;
+            const nb = pb[i] || 0;
+            if (na > nb) return 1;
+            if (na < nb) return -1;
+        }
+        return 0;
     }
 
     function loadSettings() {
@@ -205,7 +213,12 @@
             css = `.l-card, .lg-article, .card { border-radius: ${cardRadius} !important; }
                 .swal2-popup { border-radius: ${cardRadius} !important; }
                 .l-form-layout, .am-panel { border-radius: ${cardRadius} !important; }
-                .l-card.comment .author { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
+                .author, .meta {
+                    border-top-left-radius: ${cardRadius} !important;
+                    border-top-right-radius: ${cardRadius} !important;
+                    border-bottom-left-radius: 0px !important;
+                    border-bottom-right-radius: 0px !important;
+                }
                 .dropdown .center, .cs-dialog { border-radius: ${cardRadius} !important; }
                 .user-header-top { border-top-left-radius: ${cardRadius}; border-top-right-radius: ${cardRadius}; }
                 .user-header-bottom { border-bottom-left-radius: ${cardRadius}; border-bottom-right-radius: ${cardRadius}; }
@@ -214,7 +227,6 @@
                 html.ldb-bgfullscreen .article-banner.article-banner { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
                 html.ldb-bgfullscreen .article-content.article-content { border-bottom-left-radius: ${cardRadius} !important; border-bottom-right-radius: ${cardRadius} !important; }
                 html.ldb-bgfullscreen .toc.toc { border-radius: .5em !important; }
-                .meta { border-top-left-radius: ${cardRadius} !important; border-top-right-radius: ${cardRadius} !important; }
                 .ide-container { border-radius: ${cardRadius} !important; }
                 .ide-textarea[readonly].lfe-code { border-bottom-right-radius: ${cardRadius} !important; }
                 .am-viewport { border-radius: ${cardRadius} !important; }
@@ -244,7 +256,7 @@
 
         const style = document.createElement('style');
         style.id = STYLE_IDS.blur;
-        style.textContent = `.lg-article, .card, .l-card { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
+        style.textContent = `.lg-article, .card:not(:has(canvas)), .l-card:not(:has(canvas)) { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
             .dropdown .center, .popup { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
             .am-comment-hd, .am-comment-bd { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
             .article-banner { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
@@ -471,6 +483,20 @@
         return null;
     }
 
+    function forceMainTransparent() {
+        const list = document.querySelectorAll('.main-container > main, main');
+        list.forEach(el => {
+            const bgc = el.style.getPropertyValue('background-color').trim();
+            const bg = el.style.getPropertyValue('background').trim();
+            if (bgc && bgc !== 'transparent' && bgc !== 'rgba(0, 0, 0, 0)') {
+                el.style.setProperty('background-color', 'transparent', 'important');
+            }
+            if (bg && bg !== 'transparent' && bg !== 'none') {
+                el.style.setProperty('background', 'transparent', 'important');
+            }
+        });
+    }
+
     function applyFullscreenBackground() {
         removeStyleElement(STYLE_IDS.bgFullscreen);
         document.documentElement.classList.remove('ldb-bgfullscreen');
@@ -591,16 +617,48 @@
         forceMainTransparent();
     }
 
-    function forceMainTransparent() {
-        const list = document.querySelectorAll('.main-container > main, main');
-        list.forEach(el => {
-            const bgc = el.style.getPropertyValue('background-color').trim();
-            const bg = el.style.getPropertyValue('background').trim();
-            if (bgc && bgc !== 'transparent' && bgc !== 'rgba(0, 0, 0, 0)') {
-                el.style.setProperty('background-color', 'transparent', 'important');
+    function cleanThemeBackground() {
+        document.querySelectorAll('.theme-page').forEach(el => {
+            if (el.classList.contains('theme-frosted')) {
+                el.classList.remove('theme-frosted');
             }
-            if (bg && bg !== 'transparent' && bg !== 'none') {
-                el.style.setProperty('background', 'transparent', 'important');
+            if (el.hasAttribute('style')) {
+                el.removeAttribute('style');
+            }
+        });
+    }
+
+    const BG_VAR_OVERRIDES = [
+        ['--theme-body-image', 'none'],
+        ['--theme-body-color', 'none'],
+        ['--theme-body-mid-mask', 'none'],
+        ['--theme-body-color-filter', 'none'],
+        ['--theme-body-back', 'transparent']
+    ];
+
+    function isFullscreenBackgroundApplied() {
+        if (!document.documentElement.classList.contains('ldb-bgfullscreen')) return false;
+        if (!document.getElementById(STYLE_IDS.bgFullscreen)) return false;
+
+        const themePage = document.querySelector('.theme-page');
+        if (!themePage) return true;
+        if (themePage.classList.contains('theme-frosted')) return false;
+        if (!themePage._ldbSavedVars) return false;
+
+        for (const [name, value] of BG_VAR_OVERRIDES) {
+            if (themePage.style.getPropertyValue(name) !== value) return false;
+        }
+        return true;
+    }
+
+    function refreshThemeBackground(force) {
+        if (bgUpdateRaf) return;
+        bgUpdateRaf = requestAnimationFrame(() => {
+            bgUpdateRaf = null;
+            if (!force && bgFullscreen && isFullscreenBackgroundApplied()) return;
+            cleanThemeBackground();
+            if (bgFullscreen) {
+                applyFullscreenBackground();
             }
         });
     }
@@ -704,17 +762,6 @@
                 border-radius: 4px;
             }`;
         document.head.appendChild(style);
-    }
-
-    function cleanThemeBackground() {
-        document.querySelectorAll('.theme-page').forEach(el => {
-            if (el.classList.contains('theme-frosted')) {
-                el.classList.remove('theme-frosted');
-            }
-            if (el.hasAttribute('style')) {
-                el.removeAttribute('style');
-            }
-        });
     }
 
     function buildPanelHTML() {
@@ -1158,6 +1205,7 @@
     }
 
     function toggleSettingsPanel() {
+        if (!panelElement) createSettingsPanel();
         if (!panelElement) return;
         panelElement.classList.toggle('hidden');
     }
@@ -1228,25 +1276,13 @@
         appsContainer.appendChild(newLink);
     }
 
-    function compareVersions(a, b) {
-        const pa = a.split('.').map(Number);
-        const pb = b.split('.').map(Number);
-        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-            const na = pa[i] || 0;
-            const nb = pb[i] || 0;
-            if (na > nb) return 1;
-            if (na < nb) return -1;
-        }
-        return 0;
-    }
-
     function purgeJsdelivr(rawUrl, callback) {
         if (!rawUrl.includes('jsdelivr.net')) {
             callback();
             return;
         }
 
-        let purgeUrl = rawUrl
+        const purgeUrl = rawUrl
             .replace('cdn.jsdelivr.net', 'purge.jsdelivr.net')
             .replace('fastly.jsdelivr.net', 'purge.jsdelivr.net')
             .replace('gcore.jsdelivr.net', 'purge.jsdelivr.net')
@@ -1369,7 +1405,7 @@
         }
 
         applyAdBlock();
-        cleanThemeBackground();
+        refreshThemeBackground();
     }
 
     function startDomPolling() {
@@ -1378,25 +1414,42 @@
         domPollTimer = setInterval(pollDomState, DOM_POLL_INTERVAL);
     }
 
-    function init() {
-        const firstUsed = localStorage.getItem("LuoguDisplayBetter-FirstUsed") == null;
-        if (firstUsed) {
-            localStorage.setItem("LuoguDisplayBetter-FirstUsed", false);
-            writeDefaultSettings();
-        }
+    function startThemeBackgroundObserver() {
+        if (bgObserver) return;
 
-        loadSettings();
-        addSettingsNavButton();
-        applyAll();
+        bgObserver = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+                for (const node of m.addedNodes) {
+                    if (node.nodeType !== 1) continue;
+                    if (
+                        node.matches?.('.theme-page, #luogu-theme') ||
+                        node.querySelector?.('.theme-page, #luogu-theme')
+                    ) {
+                        refreshThemeBackground(true);
+                        return;
+                    }
+                }
+                if (m.type === 'characterData' || m.type === 'childList') {
+                    const t = m.target;
+                    if (
+                        t.id === 'luogu-theme' ||
+                        t.parentElement?.id === 'luogu-theme'
+                    ) {
+                        refreshThemeBackground(true);
+                        return;
+                    }
+                }
+            }
+        });
 
-        setTimeout(() => {
-            createSettingsPanel();
-            ensurePanelInDom();
-            if (firstUsed) toggleSettingsPanel();
-        }, 150);
+        bgObserver.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+    }
 
-        startDomPolling();
-
+    function startResizeObserver() {
         if (window.ResizeObserver) {
             const ro = new ResizeObserver(() => {
                 if (document.querySelector('.casket.cs-full-screen')) {
@@ -1411,6 +1464,28 @@
                 scheduleEditorLayoutUpdate();
             }
         });
+    }
+
+    function init() {
+        const firstUsed = localStorage.getItem("LuoguDisplayBetter-FirstUsed") == null;
+        if (firstUsed) {
+            localStorage.setItem("LuoguDisplayBetter-FirstUsed", false);
+            writeDefaultSettings();
+        }
+
+        loadSettings();
+        startThemeBackgroundObserver();
+        addSettingsNavButton();
+        applyAll();
+
+        setTimeout(() => {
+            createSettingsPanel();
+            ensurePanelInDom();
+            if (firstUsed && panelElement && panelElement.classList.contains('hidden')) toggleSettingsPanel();
+        }, SETTINGS_PANEL_DELAY);
+
+        startDomPolling();
+        startResizeObserver();
     }
 
     if (document.readyState === 'loading') {
