@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.5.0
+// @version      1.4.3
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
