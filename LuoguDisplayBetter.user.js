@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.4.0
+// @version      1.5.0
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
@@ -31,6 +31,10 @@
     let bgCleanObserver = null;
     let isObserving = false;
     let adBlockObserver = null;
+
+    let themeObserver = null;
+    let themeRefreshTimer = null;
+    let lastThemeSignature = '';
 
     let customCssEditor = null;
     let customCssSaveTimer = null;
@@ -177,6 +181,80 @@
         updateChannel = localStorage.getItem("LuoguDisplayBetter-updateChannel") ?? 'stable';
     }
 
+    function isDarkTheme() {
+        const root = document.documentElement;
+        const theme = root.dataset.lcolorTheme;
+        if (theme === 'dark') return true;
+        if (theme === 'light') return false;
+        if (theme === 'auto' && window.matchMedia) {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        if (root.classList.contains('lcolor-theme-dark')) return true;
+        if (document.body) {
+            const scheme = getComputedStyle(document.body).colorScheme;
+            if (scheme === 'dark') return true;
+            if (scheme === 'light') return false;
+        }
+        return false;
+    }
+
+    function parseColorToRgb(value) {
+        if (!value) return null;
+        const color = value.trim();
+
+        let match = color.match(/^#([0-9a-f]{3,8})$/i);
+        if (match) {
+            let hex = match[1];
+            if (hex.length === 3 || hex.length === 4) {
+                hex = hex.split('').map(ch => ch + ch).join('');
+            }
+            if (hex.length === 8) hex = hex.slice(0, 6);
+            if (hex.length !== 6) return null;
+            return [0, 2, 4]
+                .map(i => parseInt(hex.slice(i, i + 2), 16))
+                .join(', ');
+        }
+
+        match = color.match(/^rgba?\(\s*([\d.]+%?)\s*[, ]\s*([\d.]+%?)\s*[, ]\s*([\d.]+%?)/i);
+        if (match) {
+            const channels = match.slice(1, 4).map(channel => {
+                return channel.endsWith('%')
+                    ? Math.round(parseFloat(channel) * 2.55)
+                    : Math.round(parseFloat(channel));
+            });
+            if (channels.some(channel => isNaN(channel))) return null;
+            return channels.join(', ');
+        }
+
+        match = color.match(/^([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)$/);
+        if (match) {
+            const channels = match.slice(1, 4).map(channel => Math.round(parseFloat(channel)));
+            if (channels.some(channel => isNaN(channel))) return null;
+            return channels.join(', ');
+        }
+
+        return null;
+    }
+
+    function resolveCardBaseColor() {
+        const themePage = document.querySelector('.theme-page');
+        if (themePage) {
+            const themed = parseColorToRgb(
+                getComputedStyle(themePage).getPropertyValue('--theme-card-background')
+            );
+            if (themed) return themed;
+        }
+
+        const rootStyle = getComputedStyle(document.documentElement);
+        const container = parseColorToRgb(rootStyle.getPropertyValue('--lcolor--bg-container'));
+        if (container) return container;
+
+        const elevated = parseColorToRgb(rootStyle.getPropertyValue('--lcolor--bg-elevated'));
+        if (elevated) return elevated;
+
+        return isDarkTheme() ? '29, 32, 37' : '255, 255, 255';
+    }
+
     function applyRounded() {
         const old = document.getElementById('ldb-rounded-style');
         if (old) old.remove();
@@ -248,22 +326,13 @@
 
         const alpha = opacityValue / 100;
 
-        const themePage = document.querySelector('.theme-page');
-        let baseColor = '255, 255, 255';
-        if (themePage) {
-            const native = getComputedStyle(themePage)
-                .getPropertyValue('--theme-card-background')
-                .trim();
-            if (native) {
-                const m = native.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
-                if (m) baseColor = `${m[1]}, ${m[2]}, ${m[3]}`;
-            }
-        }
+        const baseColor = resolveCardBaseColor();
         const cardColor = `rgba(${baseColor}, ${alpha})`;
 
         const style = document.createElement('style');
         style.id = 'ldb-opacity-style';
         style.innerHTML = `.lg-article, .l-card, .card { background-color: ${cardColor} !important; }
+              .theme-page.theme-frosted .l-card::before { background-color: transparent !important; }
               .dropdown .center, .popup { background-color: ${cardColor} !important; }
               .am-comment-hd, .am-comment-bd { background-color: ${cardColor} !important; }
               nav.lfe-body > div { background-color: ${cardColor} !important; }
@@ -278,10 +347,6 @@
               .casket.cs-main, .casket .cs-header, .cs-footer,
               code[class*=language-], pre[class*=language-], .lfe-code { background-color: transparent !important; }`;
         document.head.append(style);
-
-        if (themePage) {
-            themePage.style.setProperty('--theme-card-background', cardColor);
-        }
     }
 
     function forceMainTransparent() {
@@ -325,7 +390,35 @@
         let bgPosition = 'center';
         let bgFilter = 'none';
 
-        if (themePage) {
+        // Prefer the theme JSON: it contains both the light and dark body
+        // configurations, so toggling the site theme is reflected immediately
+        // even while the theme page variables are overridden below.
+        const themeScript = document.getElementById('luogu-theme');
+        if (themeScript) {
+            try {
+                const themeData = JSON.parse(themeScript.textContent);
+                const bodyData = isDarkTheme() && themeData?.dBody
+                    ? themeData.dBody
+                    : themeData?.lBody;
+                if (bodyData?.image) {
+                    bgImage = `url("${bodyData.image}")`;
+                    const midOpts = bodyData.midOpts || {};
+                    if (midOpts.size) bgSize = midOpts.size;
+                    if (Array.isArray(midOpts.position) && midOpts.position.length >= 2) {
+                        bgPosition = `${midOpts.position[0]}% ${midOpts.position[1]}%`;
+                    }
+                    if (typeof midOpts.brightness === 'number' && midOpts.brightness !== 0) {
+                        bgFilter = `brightness(${100 + midOpts.brightness}%)`;
+                    }
+                    if (typeof midOpts.notEmpty === 'boolean') {
+                        bgRepeat = midOpts.notEmpty ? 'no-repeat' : 'repeat';
+                    }
+                }
+            } catch (e) {
+            }
+        }
+
+        if (!bgImage && themePage) {
             const cs = getComputedStyle(themePage);
 
             const img = cs.getPropertyValue('--theme-body-image').trim();
@@ -345,30 +438,6 @@
 
             const filterVal = cs.getPropertyValue('--theme-body-color-filter').trim();
             if (filterVal && filterVal !== 'none') bgFilter = filterVal;
-        }
-
-        if (!bgImage) {
-            const themeScript = document.getElementById('luogu-theme');
-            if (themeScript) {
-                try {
-                    const themeData = JSON.parse(themeScript.textContent);
-                    if (themeData?.lBody?.image) {
-                        bgImage = `url("${themeData.lBody.image}")`;
-                        const midOpts = themeData.lBody.midOpts || {};
-                        if (midOpts.size) bgSize = midOpts.size;
-                        if (Array.isArray(midOpts.position) && midOpts.position.length >= 2) {
-                            bgPosition = `${midOpts.position[0]}% ${midOpts.position[1]}%`;
-                        }
-                        if (typeof midOpts.brightness === 'number' && midOpts.brightness !== 0) {
-                            bgFilter = `brightness(${100 + midOpts.brightness}%)`;
-                        }
-                        if (typeof midOpts.notEmpty === 'boolean') {
-                            bgRepeat = midOpts.notEmpty ? 'no-repeat' : 'repeat';
-                        }
-                    }
-                } catch (e) {
-                }
-            }
         }
 
         if (!bgImage) {
@@ -446,15 +515,18 @@
                 background: transparent !important;
             }
             html.ldb-bgfullscreen .article-banner.article-banner {
-                background: rgba(245, 245, 245, ${opacityValue / 100}) !important;
+                background: rgba(var(--lcolor--bg-layout, 245, 245, 245), ${opacityValue / 100}) !important;
             }
             html.ldb-bgfullscreen .article-content.article-content {
-                background: rgba(255, 255, 255, ${opacityValue / 100}) !important;
+                background: rgba(var(--lcolor--bg-container, 255, 255, 255), ${opacityValue / 100}) !important;
             }
             html.ldb-bgfullscreen .toc.toc {
-                background: white !important;
+                background: rgb(var(--lcolor--bg-container, 255, 255, 255)) !important;
                 box-shadow: 0 2px 4px 0 rgba(0, 0, 0, .15), 0 0 1px 0 rgba(0, 0, 0, .5) inset;
                 padding: 3px 8px;
+            }
+            html.ldb-bgfullscreen[data-lcolor-theme="dark"] .toc.toc {
+                box-shadow: 0 2px 4px 0 rgba(0, 0, 0, .5), 0 0 1px 0 rgba(255, 255, 255, .15) inset;
             }
             html.ldb-bgfullscreen body {
                 background: transparent !important;
@@ -672,12 +744,62 @@
 
     function updatePanelStyle() {
         if (!panelElement) return;
-        const bv = blurValue != null ? blurValue : 0;
-        const ov = opacityValue != null ? opacityValue : 100;
-        panelElement.style.backdropFilter = `blur(${bv}px)`;
-        panelElement.style.webkitBackdropFilter = `blur(${bv}px)`;
-        panelElement.style.background = `rgba(255, 255, 255, ${ov / 100})`;
-        panelElement.style.color = '#1e1e2f';
+        const bv = blurValue != null && !isNaN(blurValue) ? blurValue : 10;
+        const ov = opacityValue != null && !isNaN(opacityValue) ? opacityValue : 75;
+        panelElement.style.setProperty('--ldb-panel-blur', `blur(${bv}px)`);
+        panelElement.style.setProperty('--ldb-panel-opacity', String(ov / 100));
+    }
+
+    function getThemeSignature() {
+        const themePage = document.querySelector('.theme-page');
+        const rootStyle = getComputedStyle(document.documentElement);
+        const parts = [
+            isDarkTheme() ? 'dark' : 'light',
+            themePage ? 'theme-page' : 'no-theme-page',
+            rootStyle.getPropertyValue('--lcolor--bg-container').trim(),
+            rootStyle.getPropertyValue('--lcolor--bg-layout').trim()
+        ];
+        if (themePage) {
+            const pageStyle = getComputedStyle(themePage);
+            parts.push(
+                pageStyle.getPropertyValue('--theme-card-background').trim(),
+                pageStyle.getPropertyValue('--theme-body-image').trim(),
+                pageStyle.getPropertyValue('--theme-body-back').trim()
+            );
+        }
+        return parts.join('|');
+    }
+
+    function refreshThemeStyles() {
+        const signature = getThemeSignature();
+        if (signature === lastThemeSignature) return;
+        lastThemeSignature = signature;
+        applyCardOpacity();
+        applyBgFullscreen();
+        updatePanelStyle();
+    }
+
+    function scheduleThemeRefresh() {
+        if (themeRefreshTimer) return;
+        themeRefreshTimer = setTimeout(function() {
+            themeRefreshTimer = null;
+            refreshThemeStyles();
+        }, 120);
+    }
+
+    function startThemeObserver() {
+        if (themeObserver) return;
+        themeObserver = new MutationObserver(scheduleThemeRefresh);
+        themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['data-lcolor-theme', 'class', 'style']
+        });
+        if (document.body) {
+            themeObserver.observe(document.body, {
+                attributes: true,
+                attributeFilter: ['class', 'style']
+            });
+        }
     }
 
     function applyAll() {
@@ -691,6 +813,7 @@
         applyScrollbarStyle();
         toggleBackgroundCleaner();
         updatePanelStyle();
+        lastThemeSignature = getThemeSignature();
     }
 
     function saveAndApply(key, value) {
@@ -770,17 +893,48 @@
 
         const css = `
             #ldb-panel {
+                --ldb-panel-bg-rgb: 255, 255, 255;
+                --ldb-panel-opacity: ${(opacityValue != null ? opacityValue : 75) / 100};
+                --ldb-panel-blur: blur(${blurValue != null ? blurValue : 10}px);
+                --ldb-panel-text: #1e1e2f;
+                --ldb-panel-heading: #2c3e50;
+                --ldb-panel-subheading: #34495e;
+                --ldb-panel-field-bg: rgba(255, 255, 255, 0.9);
+                --ldb-panel-border: #ccc;
+                --ldb-panel-border-hover: #999;
+                --ldb-panel-focus: #000;
+                --ldb-panel-focus-ring: rgba(0, 0, 0, 0.08);
+                --ldb-panel-slider-track: #dce3e8;
+                --ldb-panel-accent: #000;
+                --ldb-panel-reset-bg: #ecf0f1;
+                --ldb-panel-reset-hover: #d5dbe0;
+                --ldb-panel-reset-text: #2c3e50;
+                --ldb-panel-link: #0d3d41;
+                --ldb-panel-editor-bg: rgba(255, 255, 255, 0.9);
+                --ldb-panel-editor-text: #1e1e2f;
+                --ldb-panel-editor-gutter-border: rgba(0, 0, 0, 0.08);
+                --ldb-panel-editor-linenumber: #9aa4ad;
+                --ldb-panel-editor-selection: rgba(0, 0, 0, 0.08);
+                --ldb-panel-editor-focused-selection: rgba(0, 0, 0, 0.10);
+                --ldb-panel-editor-active-line: rgba(0, 0, 0, 0.03);
+                --ldb-panel-button-bg: #000;
+                --ldb-panel-button-hover: #333;
+                --ldb-panel-button-text: #fff;
+                --ldb-panel-status: #e53935;
+                --ldb-panel-shadow: 0 12px 40px rgba(0,0,0,0.15);
+                color-scheme: light;
+
                 position: fixed !important;
                 right: 35px !important;
                 top: 50% !important;
                 transform: translateY(-50%) !important;
                 padding: 28px 24px 24px !important;
-                background: rgba(255, 255, 255, ${(opacityValue != null ? opacityValue : 75) / 100}) !important;
-                backdrop-filter: blur(${blurValue != null ? blurValue : 10}px) !important;
-                -webkit-backdrop-filter: blur(${blurValue != null ? blurValue : 10}px) !important;
+                background: rgba(var(--ldb-panel-bg-rgb), var(--ldb-panel-opacity)) !important;
+                backdrop-filter: var(--ldb-panel-blur) !important;
+                -webkit-backdrop-filter: var(--ldb-panel-blur) !important;
                 border-radius: 24px !important;
-                box-shadow: 0 12px 40px rgba(0,0,0,0.15) !important;
-                color: #1e1e2f !important;
+                box-shadow: var(--ldb-panel-shadow) !important;
+                color: var(--ldb-panel-text) !important;
                 transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease !important;
                 z-index: 2147483000 !important;
                 box-sizing: border-box !important;
@@ -793,6 +947,38 @@
                 font-size: 14px !important;
                 line-height: 1.4 !important;
                 text-align: left !important;
+            }
+            html[data-lcolor-theme="dark"] #ldb-panel,
+            html.lcolor-theme-dark #ldb-panel,
+            body.lcolor-theme-dark #ldb-panel {
+                --ldb-panel-bg-rgb: 29, 32, 37;
+                --ldb-panel-text: #f5f5f5;
+                --ldb-panel-heading: #f5f5f5;
+                --ldb-panel-subheading: #d9d9d9;
+                --ldb-panel-field-bg: rgba(40, 43, 48, 0.9);
+                --ldb-panel-border: #4a4d52;
+                --ldb-panel-border-hover: #6b7078;
+                --ldb-panel-focus: #f5f5f5;
+                --ldb-panel-focus-ring: rgba(255, 255, 255, 0.16);
+                --ldb-panel-slider-track: #3a3d42;
+                --ldb-panel-accent: #f5f5f5;
+                --ldb-panel-reset-bg: #303339;
+                --ldb-panel-reset-hover: #3a3d42;
+                --ldb-panel-reset-text: #d9d9d9;
+                --ldb-panel-link: #8ab4f8;
+                --ldb-panel-editor-bg: rgba(40, 43, 48, 0.9);
+                --ldb-panel-editor-text: #f5f5f5;
+                --ldb-panel-editor-gutter-border: rgba(255, 255, 255, 0.10);
+                --ldb-panel-editor-linenumber: #8c8c8c;
+                --ldb-panel-editor-selection: rgba(255, 255, 255, 0.14);
+                --ldb-panel-editor-focused-selection: rgba(255, 255, 255, 0.18);
+                --ldb-panel-editor-active-line: rgba(255, 255, 255, 0.04);
+                --ldb-panel-button-bg: #f5f5f5;
+                --ldb-panel-button-hover: #d9d9d9;
+                --ldb-panel-button-text: #1d2025;
+                --ldb-panel-status: #ff7875;
+                --ldb-panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+                color-scheme: dark;
             }
             #ldb-panel.hidden {
                 opacity: 0 !important;
@@ -830,10 +1016,10 @@
             #ldb-panel-close:active { transform: scale(0.92) !important; }
 
             #ldb-panel h2 { margin: 0 0 16px 0 !important; font-size: 22px !important;
-                            font-weight: 600 !important; color: #2c3e50 !important;
+                            font-weight: 600 !important; color: var(--ldb-panel-heading) !important;
                             line-height: 1.3 !important; }
             #ldb-panel h3 { margin: 18px 0 6px 0 !important; font-size: 15px !important;
-                            font-weight: 500 !important; color: #34495e !important;
+                            font-weight: 500 !important; color: var(--ldb-panel-subheading) !important;
                             line-height: 1.3 !important; }
 
             #ldb-panel p {
@@ -851,7 +1037,7 @@
                 height: 18px !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                accent-color: #000 !important;
+                accent-color: var(--ldb-panel-accent) !important;
                 cursor: pointer !important;
                 vertical-align: middle !important;
             }
@@ -864,16 +1050,16 @@
                 font-size: 14px !important;
                 font-weight: 400 !important;
                 line-height: 1 !important;
-                color: #1e1e2f !important;
+                color: var(--ldb-panel-text) !important;
                 vertical-align: middle !important;
             }
 
             #ldb-panel input[type="range"] {
                 flex: 1 !important;
-                accent-color: #000 !important;
+                accent-color: var(--ldb-panel-accent) !important;
                 height: 4px !important;
                 border-radius: 2px !important;
-                background: #dce3e8 !important;
+                background: var(--ldb-panel-slider-track) !important;
                 cursor: pointer !important;
                 margin: 0 !important;
                 padding: 0 !important;
@@ -881,7 +1067,7 @@
             #ldb-panel input[type="range"]::-webkit-slider-thumb {
                 -webkit-appearance: none !important;
                 width: 16px !important; height: 16px !important;
-                border-radius: 50% !important; background: #000 !important;
+                border-radius: 50% !important; background: var(--ldb-panel-accent) !important;
                 box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
                 cursor: pointer !important;
             }
@@ -889,11 +1075,11 @@
             #ldb-panel-customCSS {
                 width: 100% !important;
                 height: clamp(80px, calc(100vh - 720px), 120px) !important;
-                border: 1px solid #ccc !important;
+                border: 1px solid var(--ldb-panel-border) !important;
                 border-radius: 4px !important;
                 box-sizing: border-box !important;
                 overflow: hidden !important;
-                background: rgba(255, 255, 255, 0.9) !important;
+                background: var(--ldb-panel-editor-bg) !important;
             }
             #ldb-panel-customCSS .CodeMirror {
                 height: 100% !important;
@@ -901,31 +1087,48 @@
                 font-size: 13px !important;
                 line-height: 1.5 !important;
                 background: transparent !important;
-                color: #1e1e2f !important;
+                color: var(--ldb-panel-editor-text) !important;
             }
             #ldb-panel-customCSS .CodeMirror-gutters {
                 background: transparent !important;
-                border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+                border-right: 1px solid var(--ldb-panel-editor-gutter-border) !important;
             }
             #ldb-panel-customCSS .CodeMirror-linenumber {
-                color: #9aa4ad !important;
+                color: var(--ldb-panel-editor-linenumber) !important;
             }
             #ldb-panel-customCSS .CodeMirror-cursor {
-                border-left: 1px solid #1e1e2f !important;
+                border-left: 1px solid var(--ldb-panel-editor-text) !important;
             }
             #ldb-panel-customCSS .CodeMirror-selected,
             #ldb-panel-customCSS .CodeMirror-selectedtext {
-                background: rgba(0, 0, 0, 0.08) !important;
+                background: var(--ldb-panel-editor-selection) !important;
             }
             #ldb-panel-customCSS .CodeMirror-activeline-background {
-                background: rgba(0, 0, 0, 0.03) !important;
+                background: var(--ldb-panel-editor-active-line) !important;
             }
             #ldb-panel-customCSS .CodeMirror-focused .CodeMirror-selected {
-                background: rgba(0, 0, 0, 0.10) !important;
+                background: var(--ldb-panel-editor-focused-selection) !important;
             }
             #ldb-panel-customCSS .CodeMirror-lines {
                 padding: 6px 0 !important;
             }
+
+            html[data-lcolor-theme="dark"] #ldb-panel-customCSS .cm-s-default .cm-keyword,
+            html.lcolor-theme-dark #ldb-panel-customCSS .cm-s-default .cm-keyword { color: #c678dd !important; }
+            html[data-lcolor-theme="dark"] #ldb-panel-customCSS .cm-s-default .cm-atom,
+            html.lcolor-theme-dark #ldb-panel-customCSS .cm-s-default .cm-atom { color: #d19a66 !important; }
+            html[data-lcolor-theme="dark"] #ldb-panel-customCSS .cm-s-default .cm-number,
+            html.lcolor-theme-dark #ldb-panel-customCSS .cm-s-default .cm-number { color: #d19a66 !important; }
+            html[data-lcolor-theme="dark"] #ldb-panel-customCSS .cm-s-default .cm-def,
+            html.lcolor-theme-dark #ldb-panel-customCSS .cm-s-default .cm-def { color: #61afef !important; }
+            html[data-lcolor-theme="dark"] #ldb-panel-customCSS .cm-s-default .cm-variable,
+            html.lcolor-theme-dark #ldb-panel-customCSS .cm-s-default .cm-variable { color: #e06c75 !important; }
+            html[data-lcolor-theme="dark"] #ldb-panel-customCSS .cm-s-default .cm-property,
+            html.lcolor-theme-dark #ldb-panel-customCSS .cm-s-default .cm-property { color: #abb2bf !important; }
+            html[data-lcolor-theme="dark"] #ldb-panel-customCSS .cm-s-default .cm-string,
+            html.lcolor-theme-dark #ldb-panel-customCSS .cm-s-default .cm-string { color: #98c379 !important; }
+            html[data-lcolor-theme="dark"] #ldb-panel-customCSS .cm-s-default .cm-comment,
+            html.lcolor-theme-dark #ldb-panel-customCSS .cm-s-default .cm-comment { color: #5c6370 !important; }
 
             #ldb-panel-updateChannel {
                 flex: 1 !important;
@@ -933,9 +1136,9 @@
                 padding: 0 10px !important;
                 font-size: 14px !important;
                 font-family: inherit !important;
-                color: #1e1e2f !important;
-                background: rgba(255, 255, 255, 0.9) !important;
-                border: 1px solid #ccc !important;
+                color: var(--ldb-panel-text) !important;
+                background: var(--ldb-panel-field-bg) !important;
+                border: 1px solid var(--ldb-panel-border) !important;
                 border-radius: 8px !important;
                 box-sizing: border-box !important;
                 cursor: pointer !important;
@@ -943,47 +1146,47 @@
                 transition: border-color 0.2s, box-shadow 0.2s !important;
             }
             #ldb-panel-updateChannel:hover {
-                border-color: #999 !important;
+                border-color: var(--ldb-panel-border-hover) !important;
             }
             #ldb-panel-updateChannel:focus {
-                border-color: #000 !important;
-                box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08) !important;
+                border-color: var(--ldb-panel-focus) !important;
+                box-shadow: 0 0 0 2px var(--ldb-panel-focus-ring) !important;
             }
             #ldb-panel-checkUpdate {
                 display: inline-block !important;
                 margin: 0 !important;
                 padding: 8px 24px !important;
-                background: #000 !important;
+                background: var(--ldb-panel-button-bg) !important;
                 border: none !important;
                 border-radius: 30px !important;
                 font-size: 14px !important;
                 font-weight: 500 !important;
-                color: #fff !important;
+                color: var(--ldb-panel-button-text) !important;
                 cursor: pointer !important;
                 box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
                 line-height: 1.4 !important;
                 box-sizing: border-box !important;
                 transition: background 0.2s, transform 0.1s !important;
             }
-            #ldb-panel-checkUpdate:hover  { background: #333 !important; }
+            #ldb-panel-checkUpdate:hover  { background: var(--ldb-panel-button-hover) !important; }
             #ldb-panel-checkUpdate:active { transform: scale(0.96) !important; }
             #ldb-panel-reset {
                 display: inline-block !important;
                 margin: 0 !important;
                 padding: 8px 24px !important;
-                background: #ecf0f1 !important;
+                background: var(--ldb-panel-reset-bg) !important;
                 border: none !important;
                 border-radius: 30px !important;
                 font-size: 14px !important;
                 font-weight: 500 !important;
-                color: #2c3e50 !important;
+                color: var(--ldb-panel-reset-text) !important;
                 cursor: pointer !important;
                 box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
                 line-height: 1.4 !important;
                 box-sizing: border-box !important;
                 transition: background 0.2s, transform 0.1s !important;
             }
-            #ldb-panel-reset:hover  { background: #d5dbe0 !important; }
+            #ldb-panel-reset:hover  { background: var(--ldb-panel-reset-hover) !important; }
             #ldb-panel-reset:active { transform: scale(0.96) !important; }
             #ldb-panel #ldb-updateStatus {
                 display: block !important;
@@ -991,7 +1194,7 @@
                 padding: 0 !important;
                 font-size: 12px !important;
                 line-height: 1.4 !important;
-                color: #e53935 !important;
+                color: var(--ldb-panel-status) !important;
                 text-align: left !important;
                 word-break: break-all !important;
             }
@@ -1007,7 +1210,7 @@
                 font-weight: 500 !important;
                 line-height: 1 !important;
             }
-            #ldb-panel a { color: #0d3d41 !important; text-decoration: none !important; }
+            #ldb-panel a { color: var(--ldb-panel-link) !important; text-decoration: none !important; }
             #ldb-panel a:hover { text-decoration: underline !important; }
 
             @media (max-width: 900px) {
@@ -1196,7 +1399,7 @@
                 const localVersion = GM_info.script.version;
                 if (compareVersions(remoteVersion, localVersion) > 0) {
                     statusEl.innerHTML = '发现新版本 v' + remoteVersion + '，' +
-                        '<a href="' + url + '" target="_blank" style="color:#0d6efd;text-decoration:underline;cursor:pointer;">点击安装</a>';
+                        '<a href="' + url + '" target="_blank" style="color:var(--ldb-panel-link,#0d6efd);text-decoration:underline;cursor:pointer;">点击安装</a>';
                 } else {
                     statusEl.textContent = '已是最新版本 v' + localVersion;
                     statusEl._ldbTimer = setTimeout(function() {
@@ -1233,10 +1436,20 @@
     }
 
     function addCustomButton() {
-        if (document.querySelector(`.sidebar.lside.bar.hide.nav-scrollbar`)) {
-            const ul = document.querySelector('.nav-group.on-expand ul[data-v-a119941e]');
+        const sidebar = document.querySelector('nav.lside') || document.querySelector('nav.sidebar');
+        if (sidebar) {
+            if (sidebar.querySelector('#stylePluginSettingButton')) return;
+
+            const groups = Array.from(sidebar.querySelectorAll('.nav-group'));
+            const regularGroups = groups.filter(group => {
+                return !group.classList.contains('on-expand') && group.querySelector('ul li');
+            });
+            const targetGroup = regularGroups.length
+                ? regularGroups[regularGroups.length - 1]
+                : groups.find(group => group.querySelector('ul li'));
+            const ul = targetGroup && targetGroup.querySelector('ul');
             if (!ul) return;
-            if (ul.querySelector(`#stylePluginSettingButton`)) return;
+
             const sampleLi = ul.querySelector('li');
             if (!sampleLi) return;
             const newLi = document.createElement('li');
@@ -1259,6 +1472,28 @@
             }
             newA.href = 'javascript:void(0);';
             newA.id = 'stylePluginSettingButton';
+            newA.setAttribute('aria-label', '美化插件设置');
+
+            const icon = document.createElement('span');
+            const sampleIcon = sampleLi.querySelector('span.icon') || sampleLi;
+            for (const attr of sampleIcon.attributes) {
+                if (attr.name.startsWith('data-v-')) {
+                    icon.setAttribute(attr.name, attr.value);
+                }
+            }
+            icon.className = 'icon';
+            const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            iconSvg.setAttribute('viewBox', '0 0 24 24');
+            iconSvg.setAttribute('width', '1em');
+            iconSvg.setAttribute('height', '1em');
+            iconSvg.setAttribute('fill', 'currentColor');
+            iconSvg.setAttribute('aria-hidden', 'true');
+            const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            iconPath.setAttribute('d', 'M3 17v2h6v-2H3zm0-12v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z');
+            iconSvg.appendChild(iconPath);
+            icon.appendChild(iconSvg);
+            newA.appendChild(icon);
+
             const span = document.createElement('span');
             const sampleSpan = sampleLi.querySelector('span.title');
             if (sampleSpan) {
@@ -1268,9 +1503,10 @@
                     }
                 }
                 span.className = sampleSpan.className;
+            } else {
+                span.className = 'title';
             }
             span.textContent = '美化插件设置';
-            newA.appendChild(document.createComment(''));
             newA.appendChild(span);
             newLi.appendChild(newA);
             newA.addEventListener('click', function(event) {
@@ -1313,6 +1549,7 @@
             applyIdePadding();
             if (bgFullscreen) forceMainTransparent();
             ensurePanelInDom();
+            refreshThemeStyles();
         }, 300);
     }
 
@@ -1341,11 +1578,13 @@
         initVarible();
         addCustomButton();
         startAdBlockObserver();
+        startThemeObserver();
         applyAll();
 
         setTimeout(() => {
             createPanel();
             ensurePanelInDom();
+            updatePanelStyle();
             if (firstUsed) togglePanel();
         }, 150);
 
