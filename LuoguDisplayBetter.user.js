@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.4.2
+// @version      1.4.3
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
@@ -123,25 +123,119 @@
     let domPollTimer = null;
     let bgUpdateRaf = null;
     let bgObserver = null;
+    let lastThemeSignature = '';
 
     function removeStyleElement(id) {
         const el = document.getElementById(id);
         if (el) el.remove();
     }
 
-    function computeCardColor() {
-        const alpha = opacityValue / 100;
-        const themePage = document.querySelector('.theme-page');
-        let baseColor = '255, 255, 255';
-
-        if (themePage) {
-            const native = getComputedStyle(themePage).getPropertyValue('--theme-card-background').trim();
-            if (native) {
-                const m = native.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
-                if (m) baseColor = `${m[1]}, ${m[2]}, ${m[3]}`;
-            }
+    function isDarkTheme() {
+        const root = document.documentElement;
+        const theme = root.dataset.lcolorTheme;
+        if (theme === 'dark') return true;
+        if (theme === 'light') return false;
+        if (theme === 'auto' && window.matchMedia) {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches;
         }
-        return `rgba(${baseColor}, ${alpha})`;
+        if (root.classList.contains('lcolor-theme-dark')) return true;
+        if (document.body) {
+            const scheme = getComputedStyle(document.body).colorScheme;
+            if (scheme === 'dark') return true;
+            if (scheme === 'light') return false;
+        }
+        return false;
+    }
+
+    function parseColorToRgb(value) {
+        if (!value) return null;
+        const color = value.trim();
+
+        let match = color.match(/^#([0-9a-f]{3,8})$/i);
+        if (match) {
+            let hex = match[1];
+            if (hex.length === 3 || hex.length === 4) {
+                hex = hex.split('').map(ch => ch + ch).join('');
+            }
+            if (hex.length === 8) hex = hex.slice(0, 6);
+            if (hex.length !== 6) return null;
+            return [0, 2, 4]
+                .map(i => parseInt(hex.slice(i, i + 2), 16))
+                .join(', ');
+        }
+
+        match = color.match(/^rgba?\(\s*([\d.]+%?)\s*[, ]\s*([\d.]+%?)\s*[, ]\s*([\d.]+%?)/i);
+        if (match) {
+            const channels = match.slice(1, 4).map(channel => {
+                return channel.endsWith('%')
+                    ? Math.round(parseFloat(channel) * 2.55)
+                    : Math.round(parseFloat(channel));
+            });
+            if (channels.some(channel => isNaN(channel))) return null;
+            return channels.join(', ');
+        }
+
+        match = color.match(/^([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)$/);
+        if (match) {
+            const channels = match.slice(1, 4).map(channel => Math.round(parseFloat(channel)));
+            if (channels.some(channel => isNaN(channel))) return null;
+            return channels.join(', ');
+        }
+
+        return null;
+    }
+
+    function resolveCardBaseColor() {
+        const themePage = document.querySelector('.theme-page');
+        if (themePage) {
+            const themed = parseColorToRgb(
+                getComputedStyle(themePage).getPropertyValue('--theme-card-background')
+            );
+            if (themed) return themed;
+        }
+
+        const rootStyle = getComputedStyle(document.documentElement);
+        const container = parseColorToRgb(rootStyle.getPropertyValue('--lcolor--bg-container'));
+        if (container) return container;
+
+        const elevated = parseColorToRgb(rootStyle.getPropertyValue('--lcolor--bg-elevated'));
+        if (elevated) return elevated;
+
+        return isDarkTheme() ? '29, 32, 37' : '255, 255, 255';
+    }
+
+    function getThemeSignature() {
+        const themePage = document.querySelector('.theme-page');
+        const rootStyle = getComputedStyle(document.documentElement);
+        const parts = [
+            isDarkTheme() ? 'dark' : 'light',
+            themePage ? 'theme-page' : 'no-theme-page',
+            rootStyle.getPropertyValue('--lcolor--bg-container').trim(),
+            rootStyle.getPropertyValue('--lcolor--bg-layout').trim()
+        ];
+        if (themePage) {
+            const pageStyle = getComputedStyle(themePage);
+            parts.push(
+                pageStyle.getPropertyValue('--theme-card-background').trim(),
+                pageStyle.getPropertyValue('--theme-body-image').trim(),
+                pageStyle.getPropertyValue('--theme-body-back').trim()
+            );
+        }
+        return parts.join('|');
+    }
+
+    function refreshThemeStyles() {
+        const signature = getThemeSignature();
+        if (signature === lastThemeSignature) return;
+        lastThemeSignature = signature;
+        applyCardOpacity();
+        applyFullscreenBackground();
+        updatePanelStyle();
+    }
+
+    function computeCardColor() {
+        const alpha = isNaN(opacityValue) ? 1 : opacityValue / 100;
+        return `rgba(${resolveCardBaseColor()}, ${alpha})`;
     }
 
     function copyDataAttributes(source, target) {
@@ -284,6 +378,7 @@
         const style = document.createElement('style');
         style.id = STYLE_IDS.opacity;
         style.textContent = `.lg-article, .l-card, .card { background-color: ${cardColor} !important; }
+            .theme-page.theme-frosted .l-card::before { background-color: transparent !important; }
             .dropdown .center, .popup { background-color: ${cardColor} !important; }
             .am-comment-hd, .am-comment-bd { background-color: ${cardColor} !important; }
             nav.lfe-body > div { background-color: ${cardColor} !important; }
@@ -300,11 +395,6 @@
             .casket:not(.cs-full-screen) .cs-footer,
             code[class*=language-], pre[class*=language-], .lfe-code { background-color: transparent !important; }`;
         document.head.appendChild(style);
-
-        const themePage = document.querySelector('.theme-page');
-        if (themePage) {
-            themePage.style.setProperty('--theme-card-background', cardColor);
-        }
     }
 
     function relocateEditorToBody() {
@@ -425,6 +515,35 @@
     }
 
     function resolveBackgroundImage(themePage) {
+        const themeScript = document.getElementById('luogu-theme');
+        if (themeScript) {
+            try {
+                const data = JSON.parse(themeScript.textContent);
+                const bodyData = isDarkTheme() && data && data.dBody
+                    ? data.dBody
+                    : data && data.lBody;
+                if (bodyData && bodyData.image) {
+                    const midOpts = bodyData.midOpts || {};
+                    let position = 'center';
+                    if (Array.isArray(midOpts.position) && midOpts.position.length >= 2) {
+                        position = `${midOpts.position[0]}% ${midOpts.position[1]}%`;
+                    }
+                    let filter = 'none';
+                    if (typeof midOpts.brightness === 'number' && midOpts.brightness !== 0) {
+                        filter = `brightness(${100 + midOpts.brightness}%)`;
+                    }
+                    return {
+                        image: `url("${bodyData.image}")`,
+                        repeat: midOpts.notEmpty === false ? 'repeat' : 'no-repeat',
+                        size: midOpts.size || 'cover',
+                        position: position,
+                        filter: filter
+                    };
+                }
+            } catch (e) {
+            }
+        }
+
         if (themePage) {
             const cs = getComputedStyle(themePage);
             const img = cs.getPropertyValue('--theme-body-image').trim();
@@ -437,32 +556,6 @@
                     position: cs.getPropertyValue('--theme-body-image-position').trim() || 'center',
                     filter: cs.getPropertyValue('--theme-body-color-filter').trim() || 'none'
                 };
-            }
-        }
-
-        const themeScript = document.getElementById('luogu-theme');
-        if (themeScript) {
-            try {
-                const data = JSON.parse(themeScript.textContent);
-                if (data && data.lBody && data.lBody.image) {
-                    const midOpts = data.lBody.midOpts || {};
-                    let position = 'center';
-                    if (Array.isArray(midOpts.position) && midOpts.position.length >= 2) {
-                        position = `${midOpts.position[0]}% ${midOpts.position[1]}%`;
-                    }
-                    let filter = 'none';
-                    if (typeof midOpts.brightness === 'number' && midOpts.brightness !== 0) {
-                        filter = `brightness(${100 + midOpts.brightness}%)`;
-                    }
-                    return {
-                        image: `url("${data.lBody.image}")`,
-                        repeat: midOpts.notEmpty === false ? 'repeat' : 'no-repeat',
-                        size: midOpts.size || 'cover',
-                        position: position,
-                        filter: filter
-                    };
-                }
-            } catch (e) {
             }
         }
 
@@ -561,15 +654,18 @@
             .article-banner + div[data-v-fc349d1c] { background: transparent !important; }
             html.ldb-bgfullscreen .lcolor-bg-background { background: transparent !important; }
             html.ldb-bgfullscreen .article-banner.article-banner {
-                background: rgba(245, 245, 245, ${opacityValue / 100}) !important;
+                background: rgba(var(--lcolor--bg-layout, 245, 245, 245), ${opacityValue / 100}) !important;
             }
             html.ldb-bgfullscreen .article-content.article-content {
-                background: rgba(255, 255, 255, ${opacityValue / 100}) !important;
+                background: rgba(var(--lcolor--bg-container, 255, 255, 255), ${opacityValue / 100}) !important;
             }
             html.ldb-bgfullscreen .toc.toc {
-                background: white !important;
+                background: rgb(var(--lcolor--bg-container, 255, 255, 255)) !important;
                 box-shadow: 0 2px 4px 0 rgba(0, 0, 0, .15), 0 0 1px 0 rgba(0, 0, 0, .5) inset;
                 padding: 3px 8px;
+            }
+            html.ldb-bgfullscreen[data-lcolor-theme="dark"] .toc.toc {
+                box-shadow: 0 2px 4px 0 rgba(0, 0, 0, .5), 0 0 1px 0 rgba(255, 255, 255, .15) inset;
             }
             html.ldb-bgfullscreen body {
                 background: transparent !important;
@@ -824,17 +920,43 @@
     function injectPanelStyle() {
         const style = document.createElement('style');
         style.textContent = `#ldb-panel {
+                --ldb-panel-bg-rgb: 255, 255, 255;
+                --ldb-panel-opacity: ${opacityValue / 100};
+                --ldb-panel-blur: blur(${blurValue}px);
+                --ldb-panel-text: #1e1e2f;
+                --ldb-panel-heading: #2c3e50;
+                --ldb-panel-subheading: #34495e;
+                --ldb-panel-field-bg: rgba(255, 255, 255, 0.9);
+                --ldb-panel-border: #ccc;
+                --ldb-panel-border-hover: #999;
+                --ldb-panel-focus: #000;
+                --ldb-panel-focus-ring: rgba(0, 0, 0, 0.08);
+                --ldb-panel-slider-track: #dce3e8;
+                --ldb-panel-accent: #000;
+                --ldb-panel-reset-bg: #ecf0f1;
+                --ldb-panel-reset-hover: #d5dbe0;
+                --ldb-panel-reset-text: #2c3e50;
+                --ldb-panel-link: #0d3d41;
+                --ldb-panel-editor-text: #1e1e2f;
+                --ldb-panel-editor-placeholder: #9aa4ad;
+                --ldb-panel-button-bg: #000;
+                --ldb-panel-button-hover: #333;
+                --ldb-panel-button-text: #fff;
+                --ldb-panel-status: #e53935;
+                --ldb-panel-shadow: 0 12px 40px rgba(0,0,0,0.15);
+                color-scheme: light;
+
                 position: fixed !important;
                 right: 35px !important;
                 top: 50% !important;
                 transform: translateY(-50%) !important;
                 padding: 28px 24px 24px !important;
-                background: rgba(255, 255, 255, ${opacityValue / 100}) !important;
-                backdrop-filter: blur(${blurValue}px) !important;
-                -webkit-backdrop-filter: blur(${blurValue}px) !important;
+                background: rgba(var(--ldb-panel-bg-rgb), var(--ldb-panel-opacity)) !important;
+                backdrop-filter: var(--ldb-panel-blur) !important;
+                -webkit-backdrop-filter: var(--ldb-panel-blur) !important;
                 border-radius: 24px !important;
-                box-shadow: 0 12px 40px rgba(0,0,0,0.15) !important;
-                color: #1e1e2f !important;
+                box-shadow: var(--ldb-panel-shadow) !important;
+                color: var(--ldb-panel-text) !important;
                 transition: opacity .3s ease, visibility .3s ease, transform .3s ease !important;
                 z-index: 2147483000 !important;
                 box-sizing: border-box !important;
@@ -847,6 +969,33 @@
                 font-size: 14px !important;
                 line-height: 1.4 !important;
                 text-align: left !important;
+            }
+            html[data-lcolor-theme="dark"] #ldb-panel,
+            html.lcolor-theme-dark #ldb-panel,
+            body.lcolor-theme-dark #ldb-panel {
+                --ldb-panel-bg-rgb: 29, 32, 37;
+                --ldb-panel-text: #f5f5f5;
+                --ldb-panel-heading: #f5f5f5;
+                --ldb-panel-subheading: #d9d9d9;
+                --ldb-panel-field-bg: rgba(40, 43, 48, 0.9);
+                --ldb-panel-border: #4a4d52;
+                --ldb-panel-border-hover: #6b7078;
+                --ldb-panel-focus: #f5f5f5;
+                --ldb-panel-focus-ring: rgba(255, 255, 255, 0.16);
+                --ldb-panel-slider-track: #3a3d42;
+                --ldb-panel-accent: #f5f5f5;
+                --ldb-panel-reset-bg: #303339;
+                --ldb-panel-reset-hover: #3a3d42;
+                --ldb-panel-reset-text: #d9d9d9;
+                --ldb-panel-link: #8ab4f8;
+                --ldb-panel-editor-text: #f5f5f5;
+                --ldb-panel-editor-placeholder: #8c8c8c;
+                --ldb-panel-button-bg: #f5f5f5;
+                --ldb-panel-button-hover: #d9d9d9;
+                --ldb-panel-button-text: #1d2025;
+                --ldb-panel-status: #ff7875;
+                --ldb-panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+                color-scheme: dark;
             }
             #ldb-panel.hidden {
                 opacity: 0 !important;
@@ -883,9 +1032,9 @@
             #ldb-panel-close:hover { background: #e04345 !important; transform: scale(1.06) !important; }
             #ldb-panel-close:active { transform: scale(0.92) !important; }
             #ldb-panel h2 { margin: 0 0 16px 0 !important; font-size: 22px !important;
-                            font-weight: 600 !important; color: #2c3e50 !important; line-height: 1.3 !important; }
+                            font-weight: 600 !important; color: var(--ldb-panel-heading) !important; line-height: 1.3 !important; }
             #ldb-panel h3 { margin: 18px 0 6px 0 !important; font-size: 15px !important;
-                            font-weight: 500 !important; color: #34495e !important; line-height: 1.3 !important; }
+                            font-weight: 500 !important; color: var(--ldb-panel-subheading) !important; line-height: 1.3 !important; }
             #ldb-panel p {
                 margin: 6px 0 12px 0 !important;
                 padding: 0 !important;
@@ -901,7 +1050,7 @@
                 height: 18px !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                accent-color: #000 !important;
+                accent-color: var(--ldb-panel-accent) !important;
                 cursor: pointer !important;
                 vertical-align: middle !important;
             }
@@ -914,15 +1063,15 @@
                 font-size: 14px !important;
                 font-weight: 400 !important;
                 line-height: 1 !important;
-                color: #1e1e2f !important;
+                color: var(--ldb-panel-text) !important;
                 vertical-align: middle !important;
             }
             #ldb-panel input[type="range"] {
                 flex: 1 !important;
-                accent-color: #000 !important;
+                accent-color: var(--ldb-panel-accent) !important;
                 height: 4px !important;
                 border-radius: 2px !important;
-                background: #dce3e8 !important;
+                background: var(--ldb-panel-slider-track) !important;
                 cursor: pointer !important;
                 margin: 0 !important;
                 padding: 0 !important;
@@ -932,7 +1081,7 @@
                 width: 16px !important;
                 height: 16px !important;
                 border-radius: 50% !important;
-                background: #000 !important;
+                background: var(--ldb-panel-accent) !important;
                 box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
                 cursor: pointer !important;
             }
@@ -942,11 +1091,11 @@
                 height: clamp(100px, calc(100vh - 700px), 160px) !important;
                 margin: 0 !important;
                 padding: 8px 10px !important;
-                border: 1px solid #ccc !important;
+                border: 1px solid var(--ldb-panel-border) !important;
                 border-radius: 4px !important;
                 box-sizing: border-box !important;
                 background: transparent !important;
-                color: #1e1e2f !important;
+                color: var(--ldb-panel-editor-text) !important;
                 font-family: var(--lfe-code-font, Monospace) !important;
                 font-size: 13px !important;
                 line-height: 1.5 !important;
@@ -959,10 +1108,10 @@
                 white-space: pre !important;
                 transition: border-color .2s, box-shadow .2s !important;
             }
-            #ldb-panel-customCSS::placeholder { color: #9aa4ad !important; }
+            #ldb-panel-customCSS::placeholder { color: var(--ldb-panel-editor-placeholder) !important; }
             #ldb-panel-customCSS:focus {
-                border-color: #000 !important;
-                box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08) !important;
+                border-color: var(--ldb-panel-focus) !important;
+                box-shadow: 0 0 0 2px var(--ldb-panel-focus-ring) !important;
             }
             #ldb-panel-updateChannel {
                 flex: 1 !important;
@@ -970,55 +1119,55 @@
                 padding: 0 10px !important;
                 font-size: 14px !important;
                 font-family: inherit !important;
-                color: #1e1e2f !important;
-                background: rgba(255, 255, 255, 0.9) !important;
-                border: 1px solid #ccc !important;
+                color: var(--ldb-panel-text) !important;
+                background: var(--ldb-panel-field-bg) !important;
+                border: 1px solid var(--ldb-panel-border) !important;
                 border-radius: 8px !important;
                 box-sizing: border-box !important;
                 cursor: pointer !important;
                 outline: none !important;
                 transition: border-color .2s, box-shadow .2s !important;
             }
-            #ldb-panel-updateChannel:hover { border-color: #999 !important; }
+            #ldb-panel-updateChannel:hover { border-color: var(--ldb-panel-border-hover) !important; }
             #ldb-panel-updateChannel:focus {
-                border-color: #000 !important;
-                box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08) !important;
+                border-color: var(--ldb-panel-focus) !important;
+                box-shadow: 0 0 0 2px var(--ldb-panel-focus-ring) !important;
             }
             #ldb-panel-checkUpdate {
                 display: inline-block !important;
                 margin: 0 !important;
                 padding: 8px 24px !important;
-                background: #000 !important;
+                background: var(--ldb-panel-button-bg) !important;
                 border: none !important;
                 border-radius: 30px !important;
                 font-size: 14px !important;
                 font-weight: 500 !important;
-                color: #fff !important;
+                color: var(--ldb-panel-button-text) !important;
                 cursor: pointer !important;
                 box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
                 line-height: 1.4 !important;
                 box-sizing: border-box !important;
                 transition: background .2s, transform .1s !important;
             }
-            #ldb-panel-checkUpdate:hover { background: #333 !important; }
+            #ldb-panel-checkUpdate:hover { background: var(--ldb-panel-button-hover) !important; }
             #ldb-panel-checkUpdate:active { transform: scale(0.96) !important; }
             #ldb-panel-reset {
                 display: inline-block !important;
                 margin: 0 !important;
                 padding: 8px 24px !important;
-                background: #ecf0f1 !important;
+                background: var(--ldb-panel-reset-bg) !important;
                 border: none !important;
                 border-radius: 30px !important;
                 font-size: 14px !important;
                 font-weight: 500 !important;
-                color: #2c3e50 !important;
+                color: var(--ldb-panel-reset-text) !important;
                 cursor: pointer !important;
                 box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
                 line-height: 1.4 !important;
                 box-sizing: border-box !important;
                 transition: background .2s, transform .1s !important;
             }
-            #ldb-panel-reset:hover { background: #d5dbe0 !important; }
+            #ldb-panel-reset:hover { background: var(--ldb-panel-reset-hover) !important; }
             #ldb-panel-reset:active { transform: scale(0.96) !important; }
             #ldb-panel #ldb-updateStatus {
                 display: block !important;
@@ -1026,7 +1175,7 @@
                 padding: 0 !important;
                 font-size: 12px !important;
                 line-height: 1.4 !important;
-                color: #e53935 !important;
+                color: var(--ldb-panel-status) !important;
                 text-align: left !important;
                 word-break: break-all !important;
             }
@@ -1038,7 +1187,7 @@
                 font-weight: 500 !important;
                 line-height: 1 !important;
             }
-            #ldb-panel a { color: #0d3d41 !important; text-decoration: none !important; }
+            #ldb-panel a { color: var(--ldb-panel-link) !important; text-decoration: none !important; }
             #ldb-panel a:hover { text-decoration: underline !important; }
             @media (max-width: 900px) {
                 #ldb-panel { width: 50vw !important; right: 12px !important; }
@@ -1196,12 +1345,10 @@
 
     function updatePanelStyle() {
         if (!panelElement) return;
-        const bv = blurValue != null ? blurValue : 0;
-        const ov = opacityValue != null ? opacityValue : 100;
-        panelElement.style.backdropFilter = `blur(${bv}px)`;
-        panelElement.style.webkitBackdropFilter = `blur(${bv}px)`;
-        panelElement.style.background = `rgba(255, 255, 255, ${ov / 100})`;
-        panelElement.style.color = '#1e1e2f';
+        const bv = blurValue != null && !isNaN(blurValue) ? blurValue : 10;
+        const ov = opacityValue != null && !isNaN(opacityValue) ? opacityValue : 75;
+        panelElement.style.setProperty('--ldb-panel-blur', `blur(${bv}px)`);
+        panelElement.style.setProperty('--ldb-panel-opacity', String(ov / 100));
     }
 
     function toggleSettingsPanel() {
@@ -1218,10 +1365,18 @@
     }
 
     function addSettingsNavButton() {
-        if (document.querySelector('.sidebar.lside.bar.hide.nav-scrollbar')) {
+        const sidebar = document.querySelector('nav.lside') || document.querySelector('nav.sidebar');
+        if (sidebar) {
             if (document.getElementById('stylePluginSettingButton')) return;
 
-            const ul = document.querySelector('.nav-group.on-expand ul[data-v-a119941e]');
+            const groups = Array.from(sidebar.querySelectorAll('.nav-group'));
+            const regularGroups = groups.filter(group => {
+                return !group.classList.contains('on-expand') && group.querySelector('ul li');
+            });
+            const targetGroup = regularGroups.length
+                ? regularGroups[regularGroups.length - 1]
+                : groups.find(group => group.querySelector('ul li'));
+            const ul = targetGroup && targetGroup.querySelector('ul');
             if (!ul) return;
 
             const sampleLi = ul.querySelector('li');
@@ -1240,16 +1395,34 @@
             }
             newA.href = 'javascript:void(0);';
             newA.id = 'stylePluginSettingButton';
+            newA.setAttribute('aria-label', '美化插件设置');
+
+            const icon = document.createElement('span');
+            const sampleIcon = sampleLi.querySelector('span.icon') || sampleLi;
+            copyDataAttributes(sampleIcon, icon);
+            icon.className = 'icon';
+            const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            iconSvg.setAttribute('viewBox', '0 0 24 24');
+            iconSvg.setAttribute('width', '1em');
+            iconSvg.setAttribute('height', '1em');
+            iconSvg.setAttribute('fill', 'currentColor');
+            iconSvg.setAttribute('aria-hidden', 'true');
+            const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            iconPath.setAttribute('d', 'M3 17v2h6v-2H3zm0-12v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z');
+            iconSvg.appendChild(iconPath);
+            icon.appendChild(iconSvg);
+            newA.appendChild(icon);
 
             const span = document.createElement('span');
             const sampleSpan = sampleLi.querySelector('span.title');
             if (sampleSpan) {
                 copyDataAttributes(sampleSpan, span);
                 span.className = sampleSpan.className;
+            } else {
+                span.className = 'title';
             }
             span.textContent = '美化插件设置';
 
-            newA.appendChild(document.createComment(''));
             newA.appendChild(span);
             newLi.appendChild(newA);
             newA.addEventListener('click', e => { e.preventDefault(); toggleSettingsPanel(); });
@@ -1394,6 +1567,7 @@
         applyScrollbarStyle();
         cleanThemeBackground();
         updatePanelStyle();
+        lastThemeSignature = getThemeSignature();
     }
 
     function pollDomState() {
@@ -1405,6 +1579,7 @@
         }
 
         applyAdBlock();
+        refreshThemeStyles();
         refreshThemeBackground();
     }
 

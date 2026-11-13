@@ -3,7 +3,8 @@ description: Report bugs to improve the plugin
 title: "[Bug] Describe the bug you found"
 labels: ["bug"]
 type: "Bug"
-assignees: ["UTF-8s", "zsTree0830", "a-small-OIer", "px-poxiao"]
+assignees: ["zsTree0830"]
+projects: ["Luogu-Plugins/1"]
 
 body:
 - type: markdown
