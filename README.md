@@ -41,10 +41,10 @@ Luogu Display Better is a lightweight user script for [Luogu](https://www.luogu.
 - **Sidebar Opacity**: Adjust the transparency of the sidebar independently from cards.
 - **Card Radius**: Customize the corner radius for cards, article areas, panels, and other elements.
 - **Image Radius**: Apply rounded corners to images for improved aesthetics.
-- **Fullscreen Background**: Extend the background image, gradient, or solid color configured on Luogu's Theme page (including the midground image) to cover the entire page while keeping its repeat and position settings.
+- **Fullscreen Background**: Extend the midground image, gradient, or solid color configured on Luogu's Theme page to cover the entire page while keeping its repeat and position settings.
 - **Ad Blocker**: Hide sidebar ad cards to reduce visual noise.
 - **Custom CSS**: Inject custom CSS directly to quickly personalize the interface.
-- **Update Channel**: Switch between the stable and latest release channels and check for updates right from the settings panel.
+- **Update Channel**: Switch between the stable and latest update channels and check for updates right from the settings panel.
 
 ## Installation
 
