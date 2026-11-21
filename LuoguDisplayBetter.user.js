@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.4.3
+// @version      1.4.4
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
@@ -35,7 +35,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_info
 // @grant        unsafeWindow
-// @run-at       document-end
+// @run-at       document-start
 // ==/UserScript==
 
 (function() {
@@ -45,8 +45,10 @@
         rounded: 'ldb-rounded-style',
         blur: 'ldb-blur-style',
         opacity: 'ldb-opacity-style',
+        navOpacity: 'ldb-nav-opacity-style',
         editorLayout: 'ldb-editor-layout-style',
         bgFullscreen: 'ldb-bgfullscreen-style',
+        bgFullscreenEarly: 'ldb-bgfullscreen-early-style',
         adBlock: 'ldb-adblock-style',
         customCSS: 'ldb-custom-style',
         idePadding: 'ldb-ide-padding-style',
@@ -57,6 +59,21 @@
     const EDITOR_Z_INDEX = 1500;
     const DOM_POLL_INTERVAL = 200;
     const SETTINGS_PANEL_DELAY = 150;
+
+    const SETTING_KEYS = [
+        'cardborderRad',
+        'picborderRad',
+        'blur',
+        'opacity',
+        'topbarOpacity',
+        'sidebarOpacity',
+        'cardRounded',
+        'picRounded',
+        'adBlock',
+        'bgFullscreen',
+        'customCSS',
+        'updateChannel'
+    ].map(key => 'LuoguDisplayBetter-' + key);
 
     const UPDATE_URLS = {
         stable: [
@@ -112,6 +129,7 @@
     };
 
     let cardborderRad, picborderRad, blurValue, opacityValue;
+    let topbarOpacityValue, sidebarOpacityValue;
     let cardRounded, picRounded, bgFullscreen, adBlock, customCSS, updateChannel;
 
     let panelCreated = false;
@@ -121,9 +139,13 @@
     let customCssSaveTimer = null;
     let layoutUpdateTimer = null;
     let domPollTimer = null;
-    let bgUpdateRaf = null;
     let bgObserver = null;
+    let themeRefreshRaf = null;
+    let themePageObserver = null;
+    let observedThemePage = null;
     let lastThemeSignature = '';
+    let lastSettingsSignature = '';
+    let lastIdeLayoutSignature = '';
 
     function removeStyleElement(id) {
         const el = document.getElementById(id);
@@ -214,11 +236,22 @@
             rootStyle.getPropertyValue('--lcolor--bg-layout').trim()
         ];
         if (themePage) {
+            const inline = themePage.style;
+            parts.push(
+                inline.getPropertyValue('--theme-body-image').trim(),
+                inline.getPropertyValue('--theme-body-color').trim(),
+                inline.getPropertyValue('--theme-body-back').trim(),
+                inline.getPropertyValue('--theme-body-image-position').trim(),
+                inline.getPropertyValue('--theme-body-image-size').trim(),
+                inline.getPropertyValue('--theme-body-image-repeat').trim(),
+                inline.getPropertyValue('--theme-body-color-filter').trim(),
+                inline.getPropertyValue('--theme-card-background').trim(),
+                inline.getPropertyValue('--theme-navi-back').trim()
+            );
             const pageStyle = getComputedStyle(themePage);
             parts.push(
                 pageStyle.getPropertyValue('--theme-card-background').trim(),
-                pageStyle.getPropertyValue('--theme-body-image').trim(),
-                pageStyle.getPropertyValue('--theme-body-back').trim()
+                pageStyle.getPropertyValue('--theme-navi-back').trim()
             );
         }
         return parts.join('|');
@@ -258,17 +291,44 @@
         return 0;
     }
 
+    function getSettingsSignature() {
+        return SETTING_KEYS.map(key => {
+            const value = localStorage.getItem(key);
+            return value == null ? '\u0000' : value;
+        }).join('\u0001');
+    }
+
+    function clampPercent(value, fallback) {
+        const parsed = parseFloat(value);
+        const number = isNaN(parsed) ? fallback : parsed;
+        return Math.min(100, Math.max(0, number));
+    }
+
+    function readPercent(key, fallback) {
+        const raw = localStorage.getItem(key);
+        return raw == null || raw === '' ? fallback : clampPercent(raw, fallback);
+    }
+
     function loadSettings() {
         cardborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-cardborderRad") ?? 15);
         picborderRad = parseFloat(localStorage.getItem("LuoguDisplayBetter-picborderRad") ?? 8);
         blurValue = parseFloat(localStorage.getItem("LuoguDisplayBetter-blur") ?? 10);
         opacityValue = parseFloat(localStorage.getItem("LuoguDisplayBetter-opacity") ?? 75);
+        topbarOpacityValue = readPercent(
+            "LuoguDisplayBetter-topbarOpacity",
+            isNaN(opacityValue) ? 75 : opacityValue
+        );
+        sidebarOpacityValue = readPercent(
+            "LuoguDisplayBetter-sidebarOpacity",
+            isNaN(opacityValue) ? 75 : opacityValue
+        );
         cardRounded = localStorage.getItem("LuoguDisplayBetter-cardRounded") !== 'false';
         picRounded = localStorage.getItem("LuoguDisplayBetter-picRounded") !== 'false';
         adBlock = localStorage.getItem("LuoguDisplayBetter-adBlock") === 'true';
         bgFullscreen = localStorage.getItem("LuoguDisplayBetter-bgFullscreen") !== 'false';
         customCSS = localStorage.getItem("LuoguDisplayBetter-customCSS") ?? '';
         updateChannel = localStorage.getItem("LuoguDisplayBetter-updateChannel") ?? 'stable';
+        lastSettingsSignature = getSettingsSignature();
     }
 
     function writeDefaultSettings() {
@@ -281,6 +341,8 @@
             "LuoguDisplayBetter-adBlock": false,
             "LuoguDisplayBetter-bgFullscreen": true,
             "LuoguDisplayBetter-opacity": 75,
+            "LuoguDisplayBetter-topbarOpacity": 75,
+            "LuoguDisplayBetter-sidebarOpacity": 75,
             "LuoguDisplayBetter-customCSS": '',
             "LuoguDisplayBetter-updateChannel": 'stable'
         };
@@ -307,7 +369,7 @@
             css = `.l-card, .lg-article, .card { border-radius: ${cardRadius} !important; }
                 .swal2-popup { border-radius: ${cardRadius} !important; }
                 .l-form-layout, .am-panel { border-radius: ${cardRadius} !important; }
-                .author, .meta {
+                .author[data-v-5562c764], .meta {
                     border-top-left-radius: ${cardRadius} !important;
                     border-top-right-radius: ${cardRadius} !important;
                     border-bottom-left-radius: 0px !important;
@@ -354,7 +416,7 @@
             .dropdown .center, .popup { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
             .am-comment-hd, .am-comment-bd { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
             .article-banner { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
-            .top-bar, .sidebar, .nav-group, nav.lfe-body, .user-nav, .wrapper.wrapped.lfe-body.header-layout.tiny { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
+            .top-bar, .sidebar, .lside, nav.lfe-body, .user-nav.rside, .wrapper.wrapped.lfe-body.header-layout.tiny { backdrop-filter: ${val} !important; -webkit-backdrop-filter: ${val} !important; }
             .dropdown, .dropdown .center, .popup,
             .lfe-dropdown, .el-dropdown-menu,
             .el-popper, .dropdown-menu,
@@ -365,7 +427,12 @@
             .dropdown-container, .el-popper, .el-dropdown-menu,
             .lfe-dropdown, .ant-dropdown, .ant-select-dropdown,
             .dropdown-menu { overflow: visible !important; }
-            .header-layout, .top-bar { z-index: 1000 !important; }`;
+            .header-layout, .top-bar { z-index: 1000 !important; }
+            .theme-page.theme-frosted .l-card::before,
+            .theme-page.theme-frosted > footer {
+                -webkit-backdrop-filter: none !important;
+                backdrop-filter: none !important;
+            }`;
         document.head.appendChild(style);
     }
 
@@ -381,7 +448,6 @@
             .theme-page.theme-frosted .l-card::before { background-color: transparent !important; }
             .dropdown .center, .popup { background-color: ${cardColor} !important; }
             .am-comment-hd, .am-comment-bd { background-color: ${cardColor} !important; }
-            nav.lfe-body > div { background-color: ${cardColor} !important; }
             .user-header-bottom { background-color: transparent !important; }
             .ide-container { background-color: ${cardColor} !important; }
             .panel-layout>.panel-divider.with-icon { background-color: transparent !important; }
@@ -393,7 +459,35 @@
             .casket.cs-main:not(.cs-full-screen),
             .casket:not(.cs-full-screen) .cs-header,
             .casket:not(.cs-full-screen) .cs-footer,
-            code[class*=language-], pre[class*=language-], .lfe-code { background-color: transparent !important; }`;
+            code[class*=language-], pre[class*=language-], .lfe-code { background-color: transparent !important; }
+            main > div[data-v-c8fe480a][data-v-e9b0168c-s] { background-color: transparent !important; }
+            .cm-editor, .inner-card, .cm-gutters { background-color: transparent !important; }`;
+        document.head.appendChild(style);
+    }
+
+    function applyNavOpacity() {
+        removeStyleElement(STYLE_IDS.navOpacity);
+
+        const topAlpha = clampPercent(topbarOpacityValue, 100);
+        const sideAlpha = clampPercent(sidebarOpacityValue, 100);
+        if (topAlpha >= 100 && sideAlpha >= 100) return;
+
+        const navColor = 'var(--theme-navi-back, rgb(var(--lcolor--bg-container, 255, 255, 255)))';
+        const tint = alpha => alpha <= 0
+            ? 'transparent'
+            : `color-mix(in srgb, ${navColor} ${alpha}%, transparent)`;
+
+        let css = '';
+        if (topAlpha < 100) {
+            css += `.top-bar, .user-nav.rside, .wrapper.wrapped.lfe-body.header-layout.tiny { background-color: ${tint(topAlpha)} !important; }\n`;
+        }
+        if (sideAlpha < 100) {
+            css += `nav.sidebar, nav.lside, nav.lfe-body { background-color: ${tint(sideAlpha)} !important; }\n`;
+        }
+
+        const style = document.createElement('style');
+        style.id = STYLE_IDS.navOpacity;
+        style.textContent = css;
         document.head.appendChild(style);
     }
 
@@ -502,19 +596,47 @@
         });
     }
 
-    function restoreThemeVars(themePage) {
-        if (!themePage || !themePage._ldbSavedVars) return;
-        for (const [key, value] of Object.entries(themePage._ldbSavedVars)) {
-            if (value) {
-                themePage.style.setProperty(key, value);
-            } else {
-                themePage.style.removeProperty(key);
-            }
+    function readInlineThemeVar(themePage, name) {
+        if (!themePage) return '';
+        return themePage.style.getPropertyValue(name).trim();
+    }
+
+    function buildThemeGradient(bodyData) {
+        const colors = bodyData && Array.isArray(bodyData.color)
+            ? bodyData.color.filter(Boolean)
+            : [];
+        if (!colors.length) return '';
+        if (colors.length === 1) {
+            return `linear-gradient(${colors[0]}, ${colors[0]})`;
         }
-        delete themePage._ldbSavedVars;
+        const midOpts = bodyData.midOpts || {};
+        const degree = typeof midOpts.degree === 'number' ? midOpts.degree : 0;
+        return `linear-gradient(${degree}deg, ${colors.join(', ')})`;
+    }
+
+    function resolveFullscreenSize(size) {
+        if (!size || size === 'auto') return 'cover';
+        return size;
     }
 
     function resolveBackgroundImage(themePage) {
+        if (themePage) {
+            const inlineImage = readInlineThemeVar(themePage, '--theme-body-image');
+            const inlineColor = readInlineThemeVar(themePage, '--theme-body-color');
+            const inlineBack = readInlineThemeVar(themePage, '--theme-body-back');
+            if (inlineImage || inlineColor || inlineBack) {
+                return {
+                    image: inlineImage && inlineImage !== 'none' ? inlineImage : '',
+                    color: inlineColor && inlineColor !== 'none' ? inlineColor : '',
+                    back: inlineBack && inlineBack !== 'transparent' ? inlineBack : '',
+                    repeat: readInlineThemeVar(themePage, '--theme-body-image-repeat') || 'no-repeat',
+                    size: resolveFullscreenSize(readInlineThemeVar(themePage, '--theme-body-image-size')),
+                    position: readInlineThemeVar(themePage, '--theme-body-image-position') || 'center',
+                    filter: readInlineThemeVar(themePage, '--theme-body-color-filter') || 'none'
+                };
+            }
+        }
+
         const themeScript = document.getElementById('luogu-theme');
         if (themeScript) {
             try {
@@ -522,7 +644,7 @@
                 const bodyData = isDarkTheme() && data && data.dBody
                     ? data.dBody
                     : data && data.lBody;
-                if (bodyData && bodyData.image) {
+                if (bodyData) {
                     const midOpts = bodyData.midOpts || {};
                     let position = 'center';
                     if (Array.isArray(midOpts.position) && midOpts.position.length >= 2) {
@@ -530,12 +652,18 @@
                     }
                     let filter = 'none';
                     if (typeof midOpts.brightness === 'number' && midOpts.brightness !== 0) {
-                        filter = `brightness(${100 + midOpts.brightness}%)`;
+                        filter = `brightness(${Math.max(0, Math.min(200, 100 + midOpts.brightness))}%)`;
                     }
                     return {
-                        image: `url("${bodyData.image}")`,
-                        repeat: midOpts.notEmpty === false ? 'repeat' : 'no-repeat',
-                        size: midOpts.size || 'cover',
+                        image: bodyData.image ? `url("${bodyData.image}")` : '',
+                        color: buildThemeGradient(bodyData),
+                        back: bodyData.back || '',
+                        repeat: midOpts.repeat === 'all'
+                            ? 'repeat'
+                            : midOpts.repeat === 'x'
+                                ? 'repeat-x'
+                                : midOpts.repeat === 'y' ? 'repeat-y' : 'no-repeat',
+                        size: resolveFullscreenSize(midOpts.size),
                         position: position,
                         filter: filter
                     };
@@ -547,12 +675,15 @@
         if (themePage) {
             const cs = getComputedStyle(themePage);
             const img = cs.getPropertyValue('--theme-body-image').trim();
-            if (img && img !== 'none') {
-                const urlMatch = img.match(/url\(["']?([^"')]+)["']?\)/);
+            const color = cs.getPropertyValue('--theme-body-color').trim();
+            const back = cs.getPropertyValue('--theme-body-back').trim();
+            if ((img && img !== 'none') || (color && color !== 'none') || (back && back !== 'transparent')) {
                 return {
-                    image: urlMatch ? `url("${urlMatch[1]}")` : `url("${img.replace(/^["']|["']$/g, '')}")`,
+                    image: img && img !== 'none' ? img : '',
+                    color: color && color !== 'none' ? color : '',
+                    back: back && back !== 'transparent' ? back : '',
                     repeat: cs.getPropertyValue('--theme-body-image-repeat').trim() || 'no-repeat',
-                    size: cs.getPropertyValue('--theme-body-image-size').trim() || 'cover',
+                    size: resolveFullscreenSize(cs.getPropertyValue('--theme-body-image-size').trim()),
                     position: cs.getPropertyValue('--theme-body-image-position').trim() || 'center',
                     filter: cs.getPropertyValue('--theme-body-color-filter').trim() || 'none'
                 };
@@ -565,6 +696,8 @@
             if (style.backgroundImage && style.backgroundImage !== 'none') {
                 return {
                     image: style.backgroundImage,
+                    color: '',
+                    back: '',
                     repeat: style.backgroundRepeat || 'no-repeat',
                     size: style.backgroundSize || 'cover',
                     position: style.backgroundPosition || 'center',
@@ -576,62 +709,51 @@
         return null;
     }
 
-    function forceMainTransparent() {
-        const list = document.querySelectorAll('.main-container > main, main');
-        list.forEach(el => {
-            const bgc = el.style.getPropertyValue('background-color').trim();
-            const bg = el.style.getPropertyValue('background').trim();
-            if (bgc && bgc !== 'transparent' && bgc !== 'rgba(0, 0, 0, 0)') {
-                el.style.setProperty('background-color', 'transparent', 'important');
-            }
-            if (bg && bg !== 'transparent' && bg !== 'none') {
-                el.style.setProperty('background', 'transparent', 'important');
-            }
-        });
-    }
-
     function applyFullscreenBackground() {
         removeStyleElement(STYLE_IDS.bgFullscreen);
-        document.documentElement.classList.remove('ldb-bgfullscreen');
+        removeStyleElement(STYLE_IDS.bgFullscreenEarly);
 
+        const root = document.documentElement;
         const themePage = document.querySelector('.theme-page');
-        restoreThemeVars(themePage);
 
-        if (!bgFullscreen) return;
-
-        const bg = resolveBackgroundImage(themePage);
-        if (!bg) return;
-
-        if (themePage) {
-            const varsToOverride = [
-                '--theme-body-image',
-                '--theme-body-color',
-                '--theme-body-mid-mask',
-                '--theme-body-color-filter',
-                '--theme-body-back'
-            ];
-            const saved = {};
-            for (const v of varsToOverride) {
-                saved[v] = themePage.style.getPropertyValue(v);
-            }
-            themePage._ldbSavedVars = saved;
-
-            themePage.style.setProperty('--theme-body-image', 'none');
-            themePage.style.setProperty('--theme-body-color', 'none');
-            themePage.style.setProperty('--theme-body-mid-mask', 'none');
-            themePage.style.setProperty('--theme-body-color-filter', 'none');
-            themePage.style.setProperty('--theme-body-back', 'transparent');
+        if (!bgFullscreen) {
+            root.classList.remove('ldb-bgfullscreen');
+            return;
         }
 
-        const nav = document.querySelector('.container nav');
-        if (nav && location.pathname === '/') nav.classList.remove('user-nav');
+        const bg = resolveBackgroundImage(themePage);
+        if (!bg || (!bg.image && !bg.color && !bg.back)) {
+            root.classList.remove('ldb-bgfullscreen');
+            return;
+        }
 
-        document.documentElement.classList.add('ldb-bgfullscreen');
+        const layers = [];
+        const positions = [];
+        const repeats = [];
+        const sizes = [];
+        if (bg.image) {
+            layers.push(bg.image);
+            positions.push(bg.position);
+            repeats.push(bg.repeat);
+            sizes.push(bg.size);
+        }
+        if (bg.color) {
+            layers.push(bg.color);
+            positions.push('center');
+            repeats.push('no-repeat');
+            sizes.push('100% 100%');
+        }
+
+        const alpha = Math.min(1, Math.max(0, (isNaN(opacityValue) ? 100 : opacityValue) / 100));
+        const filter = bg.filter && bg.filter !== 'none' ? bg.filter : 'none';
+        const backColor = bg.back || 'transparent';
+
+        root.classList.add('ldb-bgfullscreen');
 
         const styleEl = document.createElement('style');
         styleEl.id = STYLE_IDS.bgFullscreen;
         styleEl.textContent = `html.ldb-bgfullscreen {
-                background: transparent !important;
+                background-color: ${backColor} !important;
                 background-image: none !important;
             }
             html.ldb-bgfullscreen::before {
@@ -643,21 +765,28 @@
                 bottom: 0 !important;
                 z-index: -1 !important;
                 pointer-events: none !important;
-                background-image: ${bg.image} !important;
-                background-repeat: ${bg.repeat} !important;
-                background-position: ${bg.position} !important;
-                background-size: ${bg.size} !important;
-                filter: ${bg.filter} !important;
-                -webkit-filter: ${bg.filter} !important;
+                background-image: ${layers.length ? layers.join(', ') : 'none'} !important;
+                background-repeat: ${repeats.length ? repeats.join(', ') : 'no-repeat'} !important;
+                background-position: ${positions.length ? positions.join(', ') : 'center'} !important;
+                background-size: ${sizes.length ? sizes.join(', ') : 'cover'} !important;
+                filter: ${filter} !important;
+                -webkit-filter: ${filter} !important;
+            }
+            html.ldb-bgfullscreen .theme-page {
+                --theme-body-image: none !important;
+                --theme-body-color: none !important;
+                --theme-body-mid-mask: none !important;
+                --theme-body-color-filter: none !important;
+                --theme-body-back: transparent !important;
             }
             .header-layout.tiny[data-v-7ddab1d5], .lfe-body[data-v-12f19ddc] { background: transparent !important; }
             .article-banner + div[data-v-fc349d1c] { background: transparent !important; }
             html.ldb-bgfullscreen .lcolor-bg-background { background: transparent !important; }
             html.ldb-bgfullscreen .article-banner.article-banner {
-                background: rgba(var(--lcolor--bg-layout, 245, 245, 245), ${opacityValue / 100}) !important;
+                background: rgba(var(--lcolor--bg-layout, 245, 245, 245), ${alpha}) !important;
             }
             html.ldb-bgfullscreen .article-content.article-content {
-                background: rgba(var(--lcolor--bg-container, 255, 255, 255), ${opacityValue / 100}) !important;
+                background: rgba(var(--lcolor--bg-container, 255, 255, 255), ${alpha}) !important;
             }
             html.ldb-bgfullscreen .toc.toc {
                 background: rgb(var(--lcolor--bg-container, 255, 255, 255)) !important;
@@ -689,17 +818,11 @@
             html.ldb-bgfullscreen .wrapper.wrapped:not(.header-layout) { background: transparent !important; }
             html.ldb-bgfullscreen .footer { background: transparent !important; }
             html.ldb-bgfullscreen .theme-page { background: transparent !important; }
-            html.ldb-bgfullscreen .top-bar,
-            html.ldb-bgfullscreen .sidebar,
-            html.ldb-bgfullscreen .nav-group,
-            html.ldb-bgfullscreen nav.lfe-body,
-            html.ldb-bgfullscreen nav.lfe-body > div,
-            html.ldb-bgfullscreen .user-nav,
+            html.ldb-bgfullscreen nav.lfe-body > div { background-color: transparent !important; }
             html.ldb-bgfullscreen .header-layout {
                 background: transparent !important;
                 background-color: transparent !important;
             }
-            html.ldb-bgfullscreen .top-bar { --theme-navi-back: transparent !important; }
             html.ldb-bgfullscreen body::before,
             html.ldb-bgfullscreen body::after,
             html.ldb-bgfullscreen #app::before,
@@ -709,54 +832,114 @@
             }
             html.ldb-bgfullscreen #app { background: transparent !important; }`;
         document.head.appendChild(styleEl);
-
-        forceMainTransparent();
     }
 
-    function cleanThemeBackground() {
-        document.querySelectorAll('.theme-page').forEach(el => {
-            if (el.classList.contains('theme-frosted')) {
-                el.classList.remove('theme-frosted');
-            }
-            if (el.hasAttribute('style')) {
-                el.removeAttribute('style');
-            }
-        });
-    }
-
-    const BG_VAR_OVERRIDES = [
-        ['--theme-body-image', 'none'],
-        ['--theme-body-color', 'none'],
-        ['--theme-body-mid-mask', 'none'],
-        ['--theme-body-color-filter', 'none'],
-        ['--theme-body-back', 'transparent']
-    ];
-
-    function isFullscreenBackgroundApplied() {
-        if (!document.documentElement.classList.contains('ldb-bgfullscreen')) return false;
-        if (!document.getElementById(STYLE_IDS.bgFullscreen)) return false;
-
-        const themePage = document.querySelector('.theme-page');
-        if (!themePage) return true;
-        if (themePage.classList.contains('theme-frosted')) return false;
-        if (!themePage._ldbSavedVars) return false;
-
-        for (const [name, value] of BG_VAR_OVERRIDES) {
-            if (themePage.style.getPropertyValue(name) !== value) return false;
+    const EARLY_FULLSCREEN_CSS = `html.ldb-bgfullscreen .theme-page {
+            --theme-body-image: none !important;
+            --theme-body-color: none !important;
+            --theme-body-mid-mask: none !important;
         }
-        return true;
+        html.ldb-bgfullscreen .theme-page::before { background-image: none !important; }
+        html.ldb-bgfullscreen body,
+        html.ldb-bgfullscreen #app,
+        html.ldb-bgfullscreen .main-container,
+        html.ldb-bgfullscreen .theme-page {
+            background-image: none !important;
+        }
+        html.ldb-bgfullscreen .header-layout .background,
+        html.ldb-bgfullscreen .wrapper.wrapped:not(.header-layout) .background {
+            display: none !important;
+            opacity: 0 !important;
+        }`;
+
+    function injectEarlyFullscreenStyle() {
+        if (!bgFullscreen) return;
+        const root = document.documentElement;
+        if (!root) {
+            document.addEventListener('readystatechange', function retry() {
+                if (!document.documentElement) return;
+                document.removeEventListener('readystatechange', retry);
+                injectEarlyFullscreenStyle();
+            });
+            return;
+        }
+        if (document.getElementById(STYLE_IDS.bgFullscreenEarly)) return;
+        root.classList.add('ldb-bgfullscreen');
+        const style = document.createElement('style');
+        style.id = STYLE_IDS.bgFullscreenEarly;
+        style.textContent = EARLY_FULLSCREEN_CSS;
+        (document.head || root).appendChild(style);
     }
 
-    function refreshThemeBackground(force) {
-        if (bgUpdateRaf) return;
-        bgUpdateRaf = requestAnimationFrame(() => {
-            bgUpdateRaf = null;
-            if (!force && bgFullscreen && isFullscreenBackgroundApplied()) return;
-            cleanThemeBackground();
-            if (bgFullscreen) {
-                applyFullscreenBackground();
-            }
+    function scheduleThemeRefresh() {
+        if (themeRefreshRaf) return;
+        themeRefreshRaf = requestAnimationFrame(() => {
+            themeRefreshRaf = null;
+            refreshThemeStyles();
         });
+    }
+
+    function observeThemePage() {
+        const themePage = document.querySelector('.theme-page');
+        if (!themePage || themePage === observedThemePage) return;
+        if (themePageObserver) themePageObserver.disconnect();
+        observedThemePage = themePage;
+        themePageObserver = new MutationObserver(scheduleThemeRefresh);
+        themePageObserver.observe(themePage, {
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
+    }
+
+    function syncSettingsFromStorage() {
+        const signature = getSettingsSignature();
+        if (signature === lastSettingsSignature) return;
+        loadSettings();
+        if (document.readyState === 'loading') {
+            if (bgFullscreen) {
+                injectEarlyFullscreenStyle();
+            } else {
+                removeStyleElement(STYLE_IDS.bgFullscreenEarly);
+                document.documentElement.classList.remove('ldb-bgfullscreen');
+            }
+            return;
+        }
+        applyAll();
+        syncPanelControls();
+    }
+
+    function syncPanelControls() {
+        if (!panelElement) return;
+        const byId = id => document.getElementById(id);
+        const syncSlider = (sliderId, displayId, value, suffix) => {
+            const slider = byId(sliderId);
+            const display = byId(displayId);
+            const text = String(value);
+            if (slider && slider.value !== text) slider.value = text;
+            if (display) display.textContent = text + suffix;
+        };
+        const syncChecked = (id, value) => {
+            const checkbox = byId(id);
+            if (checkbox) checkbox.checked = !!value;
+        };
+
+        syncSlider('ldb-panel-blur', 'blur-value', blurValue, 'px');
+        syncSlider('ldb-panel-opacity', 'opacity-value', opacityValue, '%');
+        syncSlider('ldb-panel-topbar-opacity', 'topbar-opacity-value', topbarOpacityValue, '%');
+        syncSlider('ldb-panel-sidebar-opacity', 'sidebar-opacity-value', sidebarOpacityValue, '%');
+        syncSlider('ldb-panel-rounded-card', 'rounded-value-card', cardborderRad, 'px');
+        syncSlider('ldb-panel-rounded-pic', 'rounded-value-pic', picborderRad, 'px');
+        syncChecked('ldb-panel-card-rounded', cardRounded);
+        syncChecked('ldb-panel-pic-rounded', picRounded);
+        syncChecked('ldb-panel-bgfullscreen', bgFullscreen);
+        syncChecked('ldb-panel-adblock', adBlock);
+
+        const channel = byId('ldb-panel-updateChannel');
+        if (channel && channel.value !== updateChannel) channel.value = updateChannel;
+
+        if (customCssTextarea && document.activeElement !== customCssTextarea) {
+            if (customCssTextarea.value !== customCSS) customCssTextarea.value = customCSS;
+        }
     }
 
     function applyAdBlock() {
@@ -769,7 +952,7 @@
 
         const style = document.createElement('style');
         style.id = STYLE_IDS.adBlock;
-        style.textContent = `.side div[data-v-ce0b4304] { display: none !important; }`;
+        style.textContent = `.side div[data-v-04a8de04] { display: none !important; }`;
         document.head.appendChild(style);
     }
 
@@ -784,14 +967,19 @@
     }
 
     function applyIdeLayout() {
-        removeStyleElement(STYLE_IDS.idePadding);
-
         const mainContainer = document.querySelector('.main-container.lside-nav');
-        if (!mainContainer) return;
-
-        const isIdePage = !!mainContainer.querySelector('.panel-layout.ide-container');
+        const isIdePage = !!mainContainer && !!mainContainer.querySelector('.panel-layout.ide-container');
         const topBar = document.querySelector('.top-bar');
-        const topH = topBar ? topBar.getBoundingClientRect().height : 48;
+        const topH = Math.round(topBar ? topBar.getBoundingClientRect().height : 48);
+        const signature = mainContainer
+            ? `${isIdePage ? 'ide' : 'page'}|${topH}`
+            : 'none';
+        const hasStyle = !!document.getElementById(STYLE_IDS.idePadding);
+        if (signature === lastIdeLayoutSignature && (hasStyle || signature === 'none')) return;
+        lastIdeLayoutSignature = signature;
+
+        removeStyleElement(STYLE_IDS.idePadding);
+        if (!mainContainer) return;
 
         let css = `.main-container.lside-nav {
                 padding: 10px !important;
@@ -873,6 +1061,16 @@
                 <p>
                     <input id="ldb-panel-opacity" type="range" min="0" max="100" value="${opacityValue}" />
                     <span id="opacity-value">${opacityValue}%</span>
+                </p>
+                <h3>顶栏不透明度</h3>
+                <p>
+                    <input id="ldb-panel-topbar-opacity" type="range" min="0" max="100" value="${topbarOpacityValue}" />
+                    <span id="topbar-opacity-value">${topbarOpacityValue}%</span>
+                </p>
+                <h3>侧栏不透明度</h3>
+                <p>
+                    <input id="ldb-panel-sidebar-opacity" type="range" min="0" max="100" value="${sidebarOpacityValue}" />
+                    <span id="sidebar-opacity-value">${sidebarOpacityValue}%</span>
                 </p>
                 <h3>卡片圆角曲度</h3>
                 <p>
@@ -1180,7 +1378,8 @@
                 word-break: break-all !important;
             }
             #ldb-panel #ldb-updateStatus:empty { display: none !important; margin: 0 !important; }
-            #blur-value, #opacity-value, #rounded-value-card, #rounded-value-pic {
+            #blur-value, #opacity-value, #topbar-opacity-value, #sidebar-opacity-value,
+            #rounded-value-card, #rounded-value-pic {
                 display: inline-block !important;
                 width: 45px !important;
                 text-align: center !important;
@@ -1221,6 +1420,10 @@
         const blurDisplay = $('blur-value');
         const opacitySlider = $('ldb-panel-opacity');
         const opacityDisplay = $('opacity-value');
+        const topbarOpacitySlider = $('ldb-panel-topbar-opacity');
+        const topbarOpacityDisplay = $('topbar-opacity-value');
+        const sidebarOpacitySlider = $('ldb-panel-sidebar-opacity');
+        const sidebarOpacityDisplay = $('sidebar-opacity-value');
         const cardRoundedCb = $('ldb-panel-card-rounded');
         const picRoundedCb = $('ldb-panel-pic-rounded');
         const bgFullscreenCb = $('ldb-panel-bgfullscreen');
@@ -1255,6 +1458,14 @@
         opacitySlider.addEventListener('input', function() {
             opacityDisplay.textContent = this.value + '%';
             saveAndApply("LuoguDisplayBetter-opacity", this.value);
+        });
+        topbarOpacitySlider.addEventListener('input', function() {
+            topbarOpacityDisplay.textContent = this.value + '%';
+            saveAndApply("LuoguDisplayBetter-topbarOpacity", this.value);
+        });
+        sidebarOpacitySlider.addEventListener('input', function() {
+            sidebarOpacityDisplay.textContent = this.value + '%';
+            saveAndApply("LuoguDisplayBetter-sidebarOpacity", this.value);
         });
         cardroundedSlider.addEventListener('input', function() {
             cardroundedDisplay.textContent = this.value + 'px';
@@ -1305,6 +1516,10 @@
             blurDisplay.textContent = blurValue + 'px';
             opacitySlider.value = 75;
             opacityDisplay.textContent = '75%';
+            topbarOpacitySlider.value = topbarOpacityValue;
+            topbarOpacityDisplay.textContent = topbarOpacityValue + '%';
+            sidebarOpacitySlider.value = sidebarOpacityValue;
+            sidebarOpacityDisplay.textContent = sidebarOpacityValue + '%';
             cardroundedDisplay.textContent = '15px';
             picroundedDisplay.textContent = '8px';
             cardRoundedCb.checked = true;
@@ -1559,13 +1774,13 @@
         applyRoundedCorners();
         applyCardBlur();
         applyCardOpacity();
+        applyNavOpacity();
         applyFullscreenBackground();
         applyFullscreenEditorLayout();
         applyAdBlock();
         applyCustomCSS();
         applyIdeLayout();
         applyScrollbarStyle();
-        cleanThemeBackground();
         updatePanelStyle();
         lastThemeSignature = getThemeSignature();
     }
@@ -1573,14 +1788,16 @@
     function pollDomState() {
         addSettingsNavButton();
         ensurePanelInDom();
+        observeThemePage();
+        syncSettingsFromStorage();
 
         if (relocateEditorToBody()) {
             scheduleEditorLayoutUpdate();
         }
 
         applyAdBlock();
+        applyIdeLayout();
         refreshThemeStyles();
-        refreshThemeBackground();
     }
 
     function startDomPolling() {
@@ -1600,7 +1817,8 @@
                         node.matches?.('.theme-page, #luogu-theme') ||
                         node.querySelector?.('.theme-page, #luogu-theme')
                     ) {
-                        refreshThemeBackground(true);
+                        observeThemePage();
+                        scheduleThemeRefresh();
                         return;
                     }
                 }
@@ -1610,7 +1828,7 @@
                         t.id === 'luogu-theme' ||
                         t.parentElement?.id === 'luogu-theme'
                     ) {
-                        refreshThemeBackground(true);
+                        scheduleThemeRefresh();
                         return;
                     }
                 }
@@ -1641,6 +1859,14 @@
         });
     }
 
+    function startSettingsWatcher() {
+        window.addEventListener('storage', event => {
+            if (event.storageArea && event.storageArea !== localStorage) return;
+            if (event.key !== null && !event.key.startsWith('LuoguDisplayBetter-')) return;
+            syncSettingsFromStorage();
+        });
+    }
+
     function init() {
         const firstUsed = localStorage.getItem("LuoguDisplayBetter-FirstUsed") == null;
         if (firstUsed) {
@@ -1651,17 +1877,23 @@
         loadSettings();
         startThemeBackgroundObserver();
         addSettingsNavButton();
+        observeThemePage();
         applyAll();
 
         setTimeout(() => {
             createSettingsPanel();
             ensurePanelInDom();
+            syncPanelControls();
             if (firstUsed && panelElement && panelElement.classList.contains('hidden')) toggleSettingsPanel();
         }, SETTINGS_PANEL_DELAY);
 
         startDomPolling();
         startResizeObserver();
     }
+
+    loadSettings();
+    injectEarlyFullscreenStyle();
+    startSettingsWatcher();
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
