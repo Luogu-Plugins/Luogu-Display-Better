@@ -37,6 +37,7 @@ Luogu Display Better is a lightweight user script for [Luogu](https://www.luogu.
 
 - **Card Blur**: Add frosted-glass blur effects to cards, overlays, pop-ups, and comments.
 - **Card Opacity**: Adjust card background transparency for a lighter, more transparent, or cleaner look.
+- **Navigation Opacity**: Tune the transparency of the top bar and the sidebar independently.
 - **Card Radius**: Customize the corner radius for cards, article areas, panels, and other elements.
 - **Image Radius**: Apply rounded corners to images for improved aesthetics.
 - **Fullscreen Background**: Extend background images to cover the entire page, especially suitable for theme pages that use header background images.
