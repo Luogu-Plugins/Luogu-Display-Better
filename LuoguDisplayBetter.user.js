@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Luogu Display Better
 // @namespace    https://github.com/Luogu-Plugins
-// @version      1.4.4
+// @version      1.5.0
 // @description  Change your Luogu style what you like best
 // @author       Luogu-Plugins
 // @match        *://www.luogu.com.cn/*
@@ -52,7 +52,8 @@
         adBlock: 'ldb-adblock-style',
         customCSS: 'ldb-custom-style',
         idePadding: 'ldb-ide-padding-style',
-        scrollbar: 'ldb-scrollbar-style'
+        scrollbar: 'ldb-scrollbar-style',
+        controls: 'ldb-controls-style'
     };
 
     const EDITOR_GAP = 10;
@@ -74,6 +75,17 @@
         'customCSS',
         'updateChannel'
     ].map(key => 'LuoguDisplayBetter-' + key);
+
+    // ---- Lucide icons (inline, no external asset) ----
+    const ICON_PATHS = {
+        sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+        x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+        refreshCw: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+        rotateCcw: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'
+    };
+    function icon(name, size = 16) {
+        return `<svg class="ldb-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON_PATHS[name] || ''}</svg>`;
+    }
 
     const UPDATE_URLS = {
         stable: [
@@ -453,7 +465,7 @@
             .panel-layout>.panel-divider.with-icon { background-color: transparent !important; }
             .panel-layout>.panel-divider.dragging { background-color: var(--lfe-color--primary) !important; }
             .ͼ2 .cm-gutters, .ide-toolbar { background-color: transparent !important; border: 0px solid transparent !important; }
-            input:not([type=range]), textarea, .refined-input { background-color: transparent !important; }
+            .refined-input { background-color: transparent !important; }
             .panel-divider, .layout-horizontal>.panel-divider { background-color: transparent !important; }
             .combo-wrapper>.text, .lform-size-middle.block-item.tag-button,
             .casket.cs-main:not(.cs-full-screen),
@@ -956,6 +968,190 @@
         document.head.appendChild(style);
     }
 
+    function applyControlStyles() {
+        removeStyleElement(STYLE_IDS.controls);
+
+        const style = document.createElement('style');
+        style.id = STYLE_IDS.controls;
+        style.textContent = `:root {
+                --ldb-control-bg: rgba(255, 255, 255, 0.78);
+                --ldb-control-bg-hover: rgba(255, 255, 255, 0.96);
+                --ldb-control-border: #dfe4ea;
+                --ldb-control-border-hover: #c7d0d9;
+                --ldb-control-text: #2f3542;
+                --ldb-control-placeholder: #9aa4ad;
+                --ldb-control-accent: #3498db;
+                --ldb-control-accent-soft: rgba(52, 152, 219, 0.14);
+                --ldb-control-radius: 7px;
+                --ldb-control-chevron: #7f8c8d;
+                --ldb-control-menu-bg: #ffffff;
+                --ldb-control-menu-border: #e5e7eb;
+                --ldb-control-menu-shadow: 0 16px 40px -14px rgba(15, 23, 42, 0.28),
+                                          0 2px 8px rgba(15, 23, 42, 0.06);
+                --ldb-control-item-hover: rgba(52, 152, 219, 0.08);
+                --ldb-control-btn-bg: #f1f4f7;
+                --ldb-control-btn-hover: #e7ecf1;
+                --ldb-control-btn-text: #4b5563;
+            }
+
+            html[data-lcolor-theme="dark"],
+            html.lcolor-theme-dark,
+            body.lcolor-theme-dark {
+                --ldb-control-bg: rgba(255, 255, 255, 0.055);
+                --ldb-control-bg-hover: rgba(255, 255, 255, 0.085);
+                --ldb-control-border: #3f444b;
+                --ldb-control-border-hover: #555c66;
+                --ldb-control-text: #e8e8e8;
+                --ldb-control-placeholder: #8f969e;
+                --ldb-control-accent: #4aa3e0;
+                --ldb-control-accent-soft: rgba(74, 163, 224, 0.18);
+                --ldb-control-chevron: #a0a6ad;
+                --ldb-control-menu-bg: #1d2025;
+                --ldb-control-menu-border: #3a3d42;
+                --ldb-control-menu-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.65),
+                                           0 0 0 1px rgba(255, 255, 255, 0.03);
+                --ldb-control-item-hover: rgba(74, 163, 224, 0.12);
+                --ldb-control-btn-bg: #282b30;
+                --ldb-control-btn-hover: #303339;
+                --ldb-control-btn-text: #d9d9d9;
+            }
+
+            input:where(:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="color"]):not([aria-hidden="true"]):not([hidden]):not(.lfe-code):not(.cm-textfield):not(.inputarea):not([style*="display: none"]):not([style*="display:none"]):not([style*="opacity: 0"])),
+            textarea:where(:not(.lfe-code):not(.ide-textarea):not(.cm-textfield):not(.inputarea):not([aria-hidden="true"]):not([hidden]):not([style*="display: none"]):not([style*="display:none"]):not([style*="opacity: 0"])),
+            select:where(:not([multiple]):not([size]):not([aria-hidden="true"]):not([hidden]):not([style*="display: none"]):not([style*="display:none"])) {
+                background-color: var(--ldb-control-bg) !important;
+                color: var(--ldb-control-text) !important;
+                border-color: transparent !important;
+                border-radius: var(--ldb-control-radius) !important;
+                box-sizing: border-box !important;
+                box-shadow: inset 0 0 0 1px var(--ldb-control-border) !important;
+                outline: none !important;
+                caret-color: var(--ldb-control-accent) !important;
+                transition: background-color 0.15s ease, box-shadow 0.15s ease !important;
+            }
+
+            :is(input, textarea, select):where(:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="color"]):not([aria-hidden="true"]):not([hidden]):not(.lfe-code):not(.cm-textfield):not(.inputarea):not([style*="display: none"]):not([style*="display:none"]):not([style*="opacity: 0"]):not(:disabled):not(:focus)):hover {
+                background-color: var(--ldb-control-bg-hover) !important;
+                box-shadow: inset 0 0 0 1px var(--ldb-control-border-hover) !important;
+            }
+
+            :is(input, textarea, select):where(:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="color"]):not([aria-hidden="true"]):not([hidden]):not(.lfe-code):not(.cm-textfield):not(.inputarea):not([style*="display: none"]):not([style*="display:none"]):not([style*="opacity: 0"]):not(:disabled)):focus {
+                background-color: var(--ldb-control-bg-hover) !important;
+                box-shadow: inset 0 0 0 1px var(--ldb-control-accent),
+                            0 0 0 3px var(--ldb-control-accent-soft) !important;
+            }
+
+            :is(input, textarea, select):where(:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="color"]):not([aria-hidden="true"]):not([hidden]):not(.lfe-code):not(.cm-textfield):not(.inputarea):not([style*="display: none"]):not([style*="display:none"]):not([style*="opacity: 0"])):disabled {
+                opacity: 0.6 !important;
+                cursor: not-allowed !important;
+            }
+            body input::placeholder,
+            body textarea::placeholder {
+                color: var(--ldb-control-placeholder) !important;
+                opacity: 1 !important;
+            }
+
+            html[data-lcolor-theme="dark"] body :is(input, textarea, select),
+            html.lcolor-theme-dark body :is(input, textarea, select),
+            body.lcolor-theme-dark :is(input, textarea, select) {
+                color-scheme: dark !important;
+            }
+
+            body input[type="checkbox"],
+            body input[type="radio"] {
+                accent-color: var(--ldb-control-accent) !important;
+            }
+
+            body input[type="range"] {
+                accent-color: var(--ldb-control-accent) !important;
+            }
+
+            body input[type="file"] {
+                color: var(--ldb-control-text) !important;
+            }
+            body input[type="file"]::file-selector-button {
+                margin: 0 8px 0 0 !important;
+                padding: 6px 12px !important;
+                border: 0 !important;
+                border-radius: 6px !important;
+                background: var(--ldb-control-btn-bg) !important;
+                color: var(--ldb-control-btn-text) !important;
+                font-family: inherit !important;
+                font-size: 12px !important;
+                cursor: pointer !important;
+                transition: background-color 0.15s ease !important;
+            }
+            body input[type="file"]::file-selector-button:hover {
+                background: var(--ldb-control-btn-hover) !important;
+            }
+
+            select:where(:not([multiple]):not([size]):not([aria-hidden="true"]):not([hidden])) {
+                -webkit-appearance: none !important;
+                appearance: none !important;
+                padding-right: 30px !important;
+                background-image:
+                    linear-gradient(45deg, transparent 50%, var(--ldb-control-chevron) 50%),
+                    linear-gradient(135deg, var(--ldb-control-chevron) 50%, transparent 50%) !important;
+                background-position:
+                    calc(100% - 15px) calc(50% + 1px),
+                    calc(100% - 10px) calc(50% + 1px) !important;
+                background-size: 6px 6px, 6px 6px !important;
+                background-repeat: no-repeat !important;
+                cursor: pointer !important;
+            }
+            select:where(:not([multiple]):not([size])) option {
+                background-color: var(--ldb-control-menu-bg) !important;
+                color: var(--ldb-control-text) !important;
+            }
+
+            body .dropdown .center {
+                border: 1px solid var(--ldb-control-menu-border) !important;
+                box-shadow: var(--ldb-control-menu-shadow) !important;
+            }
+
+            body .am-dropdown-content,
+            body .am-selected-list,
+            body .lfe-dropdown,
+            body .el-dropdown-menu,
+            body .ant-dropdown,
+            body .ant-select-dropdown,
+            body .dropdown-menu {
+                border: 1px solid var(--ldb-control-menu-border) !important;
+                border-radius: 9px !important;
+                background-color: var(--ldb-control-menu-bg) !important;
+                box-shadow: var(--ldb-control-menu-shadow) !important;
+            }
+
+            body .am-dropdown-content li > a,
+            body .am-selected-list li,
+            body .lfe-dropdown-item,
+            body .el-dropdown-menu__item,
+            body .ant-dropdown-menu-item,
+            body .ant-select-item,
+            body .dropdown-menu > li > a {
+                border-radius: 6px !important;
+                transition: background-color 0.12s ease !important;
+            }
+            body .am-dropdown-content li > a:hover,
+            body .am-selected-list li:hover,
+            body .lfe-dropdown-item:hover,
+            body .el-dropdown-menu__item:hover,
+            body .ant-dropdown-menu-item:hover,
+            body .ant-select-item:hover,
+            body .dropdown-menu > li > a:hover {
+                background-color: var(--ldb-control-item-hover) !important;
+            }
+
+            body .am-btn,
+            body .lfe-btn,
+            body .l-btn {
+                border-radius: var(--ldb-control-radius) !important;
+                transition: background-color 0.15s ease, border-color 0.15s ease,
+                            color 0.15s ease !important;
+            }`;
+        document.head.appendChild(style);
+    }
+
     function applyCustomCSS() {
         removeStyleElement(STYLE_IDS.customCSS);
         if (!customCSS || customCSS.trim() === '') return;
@@ -1048,352 +1244,593 @@
         document.head.appendChild(style);
     }
 
+    function panelSliderMarkup(id, displayId, label, min, max, value, suffix) {
+        return `<div class="ldb-slider">
+                <div class="ldb-slider-head">
+                    <label for="${id}">${label}</label>
+                    <span class="ldb-value" id="${displayId}">${value}${suffix}</span>
+                </div>
+                <input id="${id}" type="range" min="${min}" max="${max}" value="${value}" />
+            </div>`;
+    }
+
+    function panelSwitchMarkup(id, title, desc, checked) {
+        return `<label class="ldb-switch-row">
+                <span class="ldb-switch-copy">
+                    <span class="ldb-switch-title">${title}</span>
+                    <span class="ldb-switch-desc">${desc}</span>
+                </span>
+                <input id="${id}" type="checkbox" ${checked ? 'checked' : ''} />
+                <span class="ldb-switch"></span>
+            </label>`;
+    }
+
     function buildPanelHTML() {
-        return `<div id="ldb-panel" class="l-card hidden">
-                <button id="ldb-panel-close" aria-label="关闭">×</button>
-                <h2>插件设置</h2>
-                <h3>卡片模糊度</h3>
-                <p>
-                    <input id="ldb-panel-blur" type="range" min="0" max="30" value="${blurValue}" />
-                    <span id="blur-value">${blurValue}px</span>
-                </p>
-                <h3>卡片不透明度</h3>
-                <p>
-                    <input id="ldb-panel-opacity" type="range" min="0" max="100" value="${opacityValue}" />
-                    <span id="opacity-value">${opacityValue}%</span>
-                </p>
-                <h3>顶栏不透明度</h3>
-                <p>
-                    <input id="ldb-panel-topbar-opacity" type="range" min="0" max="100" value="${topbarOpacityValue}" />
-                    <span id="topbar-opacity-value">${topbarOpacityValue}%</span>
-                </p>
-                <h3>侧栏不透明度</h3>
-                <p>
-                    <input id="ldb-panel-sidebar-opacity" type="range" min="0" max="100" value="${sidebarOpacityValue}" />
-                    <span id="sidebar-opacity-value">${sidebarOpacityValue}%</span>
-                </p>
-                <h3>卡片圆角曲度</h3>
-                <p>
-                    <input id="ldb-panel-rounded-card" type="range" min="0" max="30" value="${cardborderRad}" />
-                    <span id="rounded-value-card">${cardborderRad}px</span>
-                </p>
-                <h3>图片圆角曲度</h3>
-                <p>
-                    <input id="ldb-panel-rounded-pic" type="range" min="0" max="16" value="${picborderRad}" />
-                    <span id="rounded-value-pic">${picborderRad}px</span>
-                </p>
-                <p>
-                    <input id="ldb-panel-card-rounded" type="checkbox" ${cardRounded ? 'checked' : ''} />
-                    <label for="ldb-panel-card-rounded">卡片圆角</label>
-                </p>
-                <p>
-                    <input id="ldb-panel-pic-rounded" type="checkbox" ${picRounded ? 'checked' : ''} />
-                    <label for="ldb-panel-pic-rounded">图片圆角</label>
-                </p>
-                <p>
-                    <input id="ldb-panel-bgfullscreen" type="checkbox" ${bgFullscreen ? 'checked' : ''} />
-                    <label for="ldb-panel-bgfullscreen">背景全屏（在 <a href="/theme" target="_blank">主题</a> 内启用中景图片进行设置）</label>
-                </p>
-                <p>
-                    <input id="ldb-panel-adblock" type="checkbox" ${adBlock ? 'checked' : ''} />
-                    <label for="ldb-panel-adblock">关闭广告</label>
-                </p>
-                <h3>自定义 CSS</h3>
-                <textarea id="ldb-panel-customCSS" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-                <h3>更新通道</h3>
-                <p>
-                    <select id="ldb-panel-updateChannel">
-                        <option value="stable" ${updateChannel === 'stable' ? 'selected' : ''}>稳定版</option>
-                        <option value="latest" ${updateChannel === 'latest' ? 'selected' : ''}>最新版</option>
-                    </select>
-                </p>
-                <p>
-                    <button id="ldb-panel-checkUpdate">检查更新</button>
-                    <button id="ldb-panel-reset">还原设置</button>
-                </p>
-                <p id="ldb-updateStatus"></p>
+        return `<div id="ldb-panel" class="hidden">
+                <div class="ldb-head">
+                    <span class="ldb-head-title">${icon('sliders', 16)}<span>插件设置</span></span>
+                    <button type="button" id="ldb-panel-close" aria-label="关闭">${icon('x', 16)}</button>
+                </div>
+                <div class="ldb-body">
+                    <div class="ldb-section-label">卡片</div>
+                    ${panelSliderMarkup('ldb-panel-blur', 'blur-value', '模糊度', 0, 30, blurValue, 'px')}
+                    ${panelSliderMarkup('ldb-panel-opacity', 'opacity-value', '不透明度', 0, 100, opacityValue, '%')}
+
+                    <div class="ldb-section-label">导航栏透明度</div>
+                    ${panelSliderMarkup('ldb-panel-topbar-opacity', 'topbar-opacity-value', '顶栏', 0, 100, topbarOpacityValue, '%')}
+                    ${panelSliderMarkup('ldb-panel-sidebar-opacity', 'sidebar-opacity-value', '侧栏', 0, 100, sidebarOpacityValue, '%')}
+
+                    <div class="ldb-section-label">圆角</div>
+                    ${panelSliderMarkup('ldb-panel-rounded-card', 'rounded-value-card', '卡片', 0, 30, cardborderRad, 'px')}
+                    ${panelSliderMarkup('ldb-panel-rounded-pic', 'rounded-value-pic', '图片', 0, 16, picborderRad, 'px')}
+                    ${panelSwitchMarkup('ldb-panel-card-rounded', '卡片圆角', '应用到卡片、文章与面板', cardRounded)}
+                    ${panelSwitchMarkup('ldb-panel-pic-rounded', '图片圆角', '应用到图片与头像', picRounded)}
+
+                    <div class="ldb-section-label">功能</div>
+                    <div class="ldb-switch-row">
+                        <span class="ldb-switch-copy">
+                            <span class="ldb-switch-title">背景全屏</span>
+                            <span class="ldb-switch-desc">需在 <a href="/theme" target="_blank" rel="noopener">主题</a> 中启用中景图片</span>
+                        </span>
+                        <label class="ldb-switch-control" aria-label="背景全屏">
+                            <input id="ldb-panel-bgfullscreen" type="checkbox" aria-label="背景全屏" ${bgFullscreen ? 'checked' : ''} />
+                            <span class="ldb-switch"></span>
+                        </label>
+                    </div>
+                    ${panelSwitchMarkup('ldb-panel-adblock', '关闭广告', '隐藏侧栏广告卡片', adBlock)}
+
+                    <div class="ldb-section-label">自定义 CSS</div>
+                    <textarea id="ldb-panel-customCSS" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="/* 在这里写自定义 CSS */"></textarea>
+
+                    <div class="ldb-section-label">更新</div>
+                    <div class="ldb-select-row">
+                        <label for="ldb-panel-updateChannel">更新通道</label>
+                        <select id="ldb-panel-updateChannel">
+                            <option value="stable" ${updateChannel === 'stable' ? 'selected' : ''}>稳定版</option>
+                            <option value="latest" ${updateChannel === 'latest' ? 'selected' : ''}>最新版</option>
+                        </select>
+                    </div>
+                    <div class="ldb-actions">
+                        <button type="button" id="ldb-panel-checkUpdate">${icon('refreshCw', 14)}检查更新</button>
+                        <button type="button" id="ldb-panel-reset">${icon('rotateCcw', 14)}还原设置</button>
+                    </div>
+                    <div id="ldb-updateStatus"></div>
+                </div>
             </div>`;
     }
 
     function injectPanelStyle() {
+        const existing = document.getElementById('ldb-panel-style');
+        if (existing) existing.remove();
+
+        const panelOpacity = isNaN(opacityValue)
+            ? 0.96
+            : Math.min(1, Math.max(0.96, opacityValue / 100));
+        const panelBlur = isNaN(blurValue)
+            ? 10
+            : Math.min(30, Math.max(0, blurValue));
+
         const style = document.createElement('style');
+        style.id = 'ldb-panel-style';
         style.textContent = `#ldb-panel {
                 --ldb-panel-bg-rgb: 255, 255, 255;
-                --ldb-panel-opacity: ${opacityValue / 100};
-                --ldb-panel-blur: blur(${blurValue}px);
-                --ldb-panel-text: #1e1e2f;
+                --ldb-panel-opacity: ${panelOpacity};
+                --ldb-panel-blur: blur(${panelBlur}px);
+                --ldb-panel-text: #333;
                 --ldb-panel-heading: #2c3e50;
-                --ldb-panel-subheading: #34495e;
-                --ldb-panel-field-bg: rgba(255, 255, 255, 0.9);
-                --ldb-panel-border: #ccc;
-                --ldb-panel-border-hover: #999;
-                --ldb-panel-focus: #000;
-                --ldb-panel-focus-ring: rgba(0, 0, 0, 0.08);
-                --ldb-panel-slider-track: #dce3e8;
-                --ldb-panel-accent: #000;
-                --ldb-panel-reset-bg: #ecf0f1;
-                --ldb-panel-reset-hover: #d5dbe0;
-                --ldb-panel-reset-text: #2c3e50;
-                --ldb-panel-link: #0d3d41;
-                --ldb-panel-editor-text: #1e1e2f;
-                --ldb-panel-editor-placeholder: #9aa4ad;
-                --ldb-panel-button-bg: #000;
-                --ldb-panel-button-hover: #333;
-                --ldb-panel-button-text: #fff;
-                --ldb-panel-status: #e53935;
-                --ldb-panel-shadow: 0 12px 40px rgba(0,0,0,0.15);
+                --ldb-panel-muted: #7f8c8d;
+                --ldb-panel-label: #555;
+                --ldb-panel-border: #e5e7eb;
+                --ldb-panel-border-strong: #d7dbe0;
+                --ldb-panel-field-bg: #fbfcfd;
+                --ldb-panel-slider-track: #e2e6ea;
+                --ldb-panel-accent: #3498db;
+                --ldb-panel-accent-hover: #2f89c5;
+                --ldb-panel-accent-soft: rgba(52, 152, 219, 0.14);
+                --ldb-panel-btn-bg: #f5f6f7;
+                --ldb-panel-btn-hover: #ebedf0;
+                --ldb-panel-btn-text: #555;
+                --ldb-panel-btn-border: #dcdee2;
+                --ldb-panel-shadow: 0 18px 48px -14px rgba(15, 23, 42, 0.32),
+                                    0 2px 8px rgba(15, 23, 42, 0.06);
                 color-scheme: light;
 
                 position: fixed !important;
-                right: 35px !important;
+                right: 24px !important;
                 top: 50% !important;
                 transform: translateY(-50%) !important;
-                padding: 28px 24px 24px !important;
+                z-index: 2147483000 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                width: 330px !important;
+                max-width: calc(100vw - 48px) !important;
+                max-height: min(84vh, 780px) !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+                box-sizing: border-box !important;
                 background: rgba(var(--ldb-panel-bg-rgb), var(--ldb-panel-opacity)) !important;
                 backdrop-filter: var(--ldb-panel-blur) !important;
                 -webkit-backdrop-filter: var(--ldb-panel-blur) !important;
-                border-radius: 24px !important;
+                border: 1px solid var(--ldb-panel-border) !important;
+                border-radius: 12px !important;
                 box-shadow: var(--ldb-panel-shadow) !important;
                 color: var(--ldb-panel-text) !important;
-                transition: opacity .3s ease, visibility .3s ease, transform .3s ease !important;
-                z-index: 2147483000 !important;
-                box-sizing: border-box !important;
-                width: min(400px, 50vw) !important;
-                max-width: calc(100vw - 70px) !important;
-                max-height: calc(100vh - 40px) !important;
-                overflow-y: auto !important;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
                              "PingFang SC", "Microsoft YaHei", sans-serif !important;
-                font-size: 14px !important;
-                line-height: 1.4 !important;
+                font-size: 13px !important;
+                line-height: 1.45 !important;
                 text-align: left !important;
+                transition: opacity 0.24s ease, transform 0.24s ease,
+                            visibility 0.24s ease !important;
             }
+
             html[data-lcolor-theme="dark"] #ldb-panel,
             html.lcolor-theme-dark #ldb-panel,
             body.lcolor-theme-dark #ldb-panel {
                 --ldb-panel-bg-rgb: 29, 32, 37;
-                --ldb-panel-text: #f5f5f5;
-                --ldb-panel-heading: #f5f5f5;
-                --ldb-panel-subheading: #d9d9d9;
+                --ldb-panel-text: #e8e8e8;
+                --ldb-panel-heading: #f2f2f2;
+                --ldb-panel-muted: #a0a6ad;
+                --ldb-panel-label: #c9cdd2;
+                --ldb-panel-border: #3a3d42;
+                --ldb-panel-border-strong: #4a4d52;
                 --ldb-panel-field-bg: rgba(40, 43, 48, 0.9);
-                --ldb-panel-border: #4a4d52;
-                --ldb-panel-border-hover: #6b7078;
-                --ldb-panel-focus: #f5f5f5;
-                --ldb-panel-focus-ring: rgba(255, 255, 255, 0.16);
                 --ldb-panel-slider-track: #3a3d42;
-                --ldb-panel-accent: #f5f5f5;
-                --ldb-panel-reset-bg: #303339;
-                --ldb-panel-reset-hover: #3a3d42;
-                --ldb-panel-reset-text: #d9d9d9;
-                --ldb-panel-link: #8ab4f8;
-                --ldb-panel-editor-text: #f5f5f5;
-                --ldb-panel-editor-placeholder: #8c8c8c;
-                --ldb-panel-button-bg: #f5f5f5;
-                --ldb-panel-button-hover: #d9d9d9;
-                --ldb-panel-button-text: #1d2025;
-                --ldb-panel-status: #ff7875;
-                --ldb-panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+                --ldb-panel-accent: #4aa3e0;
+                --ldb-panel-accent-hover: #3d93cf;
+                --ldb-panel-accent-soft: rgba(74, 163, 224, 0.18);
+                --ldb-panel-btn-bg: #282b30;
+                --ldb-panel-btn-hover: #303339;
+                --ldb-panel-btn-text: #d9d9d9;
+                --ldb-panel-btn-border: #4a4d52;
+                --ldb-panel-shadow: 0 18px 48px -14px rgba(0, 0, 0, 0.65),
+                                    0 0 0 1px rgba(255, 255, 255, 0.03);
                 color-scheme: dark;
             }
+
+            #ldb-panel, #ldb-panel * { box-sizing: border-box !important; }
+
             #ldb-panel.hidden {
                 opacity: 0 !important;
                 visibility: hidden !important;
-                transform: translateY(-50%) scale(0.96) !important;
+                transform: translateY(-50%) translateX(calc(100% + 48px)) !important;
                 pointer-events: none !important;
             }
+
+            #ldb-panel .ldb-head {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+                flex: 0 0 auto !important;
+                padding: 11px 12px 11px 14px !important;
+                border-bottom: 1px solid var(--ldb-panel-border) !important;
+            }
+            #ldb-panel .ldb-head-title {
+                display: flex !important;
+                align-items: center !important;
+                gap: 7px !important;
+                min-width: 0 !important;
+                color: var(--ldb-panel-heading) !important;
+                font-size: 13.5px !important;
+                font-weight: 600 !important;
+                line-height: 1.3 !important;
+            }
+            #ldb-panel .ldb-head-title .ldb-icon {
+                color: var(--ldb-panel-accent) !important;
+            }
+            #ldb-panel .ldb-icon {
+                display: block !important;
+                flex: 0 0 auto !important;
+            }
+            #ldb-panel .ldb-head-title .ldb-icon,
+            #ldb-panel-close .ldb-icon {
+                width: 16px !important;
+                height: 16px !important;
+            }
+
             #ldb-panel-close {
-                position: absolute !important;
-                top: 12px !important;
-                right: 12px !important;
-                width: 32px !important;
-                height: 32px !important;
-                padding: 1px 0 0 0 !important;
-                margin: 0 !important;
-                border: none !important;
-                border-radius: 50% !important;
-                background: #ff4d4f !important;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
-                color: #fff !important;
-                font-family: Arial, Helvetica, sans-serif !important;
-                font-size: 22px !important;
-                font-weight: 400 !important;
-                line-height: 1 !important;
-                text-align: center !important;
-                box-sizing: border-box !important;
                 display: inline-flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                overflow: hidden !important;
-                cursor: pointer !important;
-                transition: background .2s, transform .2s !important;
-            }
-            #ldb-panel-close:hover { background: #e04345 !important; transform: scale(1.06) !important; }
-            #ldb-panel-close:active { transform: scale(0.92) !important; }
-            #ldb-panel h2 { margin: 0 0 16px 0 !important; font-size: 22px !important;
-                            font-weight: 600 !important; color: var(--ldb-panel-heading) !important; line-height: 1.3 !important; }
-            #ldb-panel h3 { margin: 18px 0 6px 0 !important; font-size: 15px !important;
-                            font-weight: 500 !important; color: var(--ldb-panel-subheading) !important; line-height: 1.3 !important; }
-            #ldb-panel p {
-                margin: 6px 0 12px 0 !important;
+                flex: 0 0 auto !important;
+                width: 28px !important;
+                height: 28px !important;
+                margin: 0 0 0 auto !important;
                 padding: 0 !important;
+                border: 1px solid transparent !important;
+                border-radius: 6px !important;
+                background: transparent !important;
+                color: var(--ldb-panel-muted) !important;
+                font-size: 0 !important;
+                line-height: 1 !important;
+                cursor: pointer !important;
+                outline: none !important;
+                box-shadow: none !important;
+                transition: background-color 0.15s, color 0.15s !important;
+            }
+            #ldb-panel-close:hover {
+                background: var(--ldb-panel-btn-hover) !important;
+                color: var(--ldb-panel-heading) !important;
+            }
+            #ldb-panel-close:active { transform: none !important; }
+            #ldb-panel-close:focus-visible {
+                outline: 2px solid var(--ldb-panel-accent) !important;
+                outline-offset: 1px !important;
+            }
+
+            #ldb-panel .ldb-body {
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                padding: 12px 14px 14px !important;
+                overflow-y: auto !important;
+                overscroll-behavior: contain !important;
+                scrollbar-width: thin !important;
+                scrollbar-color: var(--ldb-panel-slider-track) transparent !important;
+            }
+            #ldb-panel .ldb-body::-webkit-scrollbar { width: 6px !important; }
+            #ldb-panel .ldb-body::-webkit-scrollbar-thumb {
+                background: var(--ldb-panel-slider-track) !important;
+                border-radius: 3px !important;
+            }
+            #ldb-panel .ldb-body::-webkit-scrollbar-track { background: transparent !important; }
+
+            #ldb-panel .ldb-section-label {
+                margin: 4px 0 0 !important;
+                padding: 9px 0 6px !important;
+                border-top: 1px solid var(--ldb-panel-border) !important;
+                color: var(--ldb-panel-muted) !important;
+                font-size: 11.5px !important;
+                font-weight: 600 !important;
+                line-height: 1.3 !important;
+                letter-spacing: 0.02em !important;
+            }
+            #ldb-panel .ldb-section-label:first-child {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+                border-top: 0 !important;
+            }
+
+            #ldb-panel .ldb-slider { margin: 0 0 10px !important; }
+            #ldb-panel .ldb-slider-head {
                 display: flex !important;
                 align-items: center !important;
+                justify-content: space-between !important;
                 gap: 10px !important;
-                font-size: 14px !important;
+                margin: 8px 0 6px !important;
+            }
+            #ldb-panel .ldb-slider-head label {
+                color: var(--ldb-panel-label) !important;
+                font-size: 12.5px !important;
+                font-weight: 400 !important;
+                line-height: 1.3 !important;
+                cursor: default !important;
+            }
+            #ldb-panel .ldb-value {
+                min-width: 38px !important;
+                padding: 1px 6px !important;
+                border: 1px solid var(--ldb-panel-border) !important;
+                border-radius: 4px !important;
+                background: var(--ldb-panel-btn-bg) !important;
+                color: var(--ldb-panel-muted) !important;
+                font-size: 11px !important;
+                font-variant-numeric: tabular-nums !important;
+                text-align: center !important;
                 line-height: 1.4 !important;
             }
-            #ldb-panel p > input[type="checkbox"] {
-                flex: 0 0 auto !important;
-                width: 18px !important;
-                height: 18px !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                accent-color: var(--ldb-panel-accent) !important;
-                cursor: pointer !important;
-                vertical-align: middle !important;
-            }
-            #ldb-panel p > label {
-                display: inline-block !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                cursor: pointer !important;
-                user-select: none !important;
-                font-size: 14px !important;
-                font-weight: 400 !important;
-                line-height: 1 !important;
-                color: var(--ldb-panel-text) !important;
-                vertical-align: middle !important;
-            }
+
             #ldb-panel input[type="range"] {
-                flex: 1 !important;
-                accent-color: var(--ldb-panel-accent) !important;
+                -webkit-appearance: none !important;
+                appearance: none !important;
+                display: block !important;
+                width: 100% !important;
+                height: 16px !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: 0 !important;
+                background: transparent !important;
+                cursor: pointer !important;
+                outline: none !important;
+            }
+            #ldb-panel input[type="range"]::-webkit-slider-runnable-track {
                 height: 4px !important;
                 border-radius: 2px !important;
                 background: var(--ldb-panel-slider-track) !important;
-                cursor: pointer !important;
-                margin: 0 !important;
-                padding: 0 !important;
             }
             #ldb-panel input[type="range"]::-webkit-slider-thumb {
                 -webkit-appearance: none !important;
+                width: 14px !important;
+                height: 14px !important;
+                margin-top: -5px !important;
+                border: 2px solid var(--ldb-panel-accent) !important;
+                border-radius: 50% !important;
+                background: #fff !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+                cursor: pointer !important;
+            }
+            #ldb-panel input[type="range"]::-moz-range-track {
+                height: 4px !important;
+                border-radius: 2px !important;
+                background: var(--ldb-panel-slider-track) !important;
+            }
+            #ldb-panel input[type="range"]::-moz-range-thumb {
+                width: 10px !important;
+                height: 10px !important;
+                border: 2px solid var(--ldb-panel-accent) !important;
+                border-radius: 50% !important;
+                background: #fff !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+                cursor: pointer !important;
+            }
+            #ldb-panel input[type="range"]:focus-visible::-webkit-slider-thumb {
+                box-shadow: 0 0 0 3px var(--ldb-panel-accent-soft) !important;
+            }
+            #ldb-panel input[type="range"]:focus-visible::-moz-range-thumb {
+                box-shadow: 0 0 0 3px var(--ldb-panel-accent-soft) !important;
+            }
+
+            #ldb-panel .ldb-switch-row {
+                position: relative !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                gap: 12px !important;
+                padding: 9px 0 !important;
+                border-top: 1px solid var(--ldb-panel-border) !important;
+                cursor: pointer !important;
+            }
+            #ldb-panel .ldb-switch-copy {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 2px !important;
+                min-width: 0 !important;
+            }
+            #ldb-panel .ldb-switch-title {
+                color: var(--ldb-panel-label) !important;
+                font-size: 12.5px !important;
+                font-weight: 400 !important;
+                line-height: 1.35 !important;
+            }
+            #ldb-panel .ldb-switch-desc {
+                color: var(--ldb-panel-muted) !important;
+                font-size: 11px !important;
+                font-weight: 400 !important;
+                line-height: 1.4 !important;
+            }
+            #ldb-panel .ldb-switch-row input[type="checkbox"] {
+                position: absolute !important;
+                width: 1px !important;
+                height: 1px !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+            #ldb-panel .ldb-switch-control {
+                display: inline-flex !important;
+                align-items: center !important;
+                flex: 0 0 auto !important;
+                cursor: pointer !important;
+            }
+            #ldb-panel .ldb-switch {
+                position: relative !important;
+                display: block !important;
+                flex: 0 0 auto !important;
+                width: 34px !important;
+                height: 20px !important;
+                border-radius: 10px !important;
+                background: var(--ldb-panel-slider-track) !important;
+                transition: background-color 0.18s !important;
+                cursor: pointer !important;
+            }
+            #ldb-panel .ldb-switch::after {
+                content: "" !important;
+                position: absolute !important;
+                top: 2px !important;
+                left: 2px !important;
                 width: 16px !important;
                 height: 16px !important;
                 border-radius: 50% !important;
-                background: var(--ldb-panel-accent) !important;
-                box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
-                cursor: pointer !important;
+                background: #fff !important;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+                transition: transform 0.18s !important;
             }
+            #ldb-panel input[type="checkbox"]:checked + .ldb-switch {
+                background: var(--ldb-panel-accent) !important;
+            }
+            #ldb-panel input[type="checkbox"]:checked + .ldb-switch::after {
+                transform: translateX(14px) !important;
+            }
+            #ldb-panel input[type="checkbox"]:focus-visible + .ldb-switch {
+                box-shadow: 0 0 0 3px var(--ldb-panel-accent-soft) !important;
+            }
+
             #ldb-panel-customCSS {
                 display: block !important;
                 width: 100% !important;
-                height: clamp(100px, calc(100vh - 700px), 160px) !important;
-                margin: 0 !important;
-                padding: 8px 10px !important;
-                border: 1px solid var(--ldb-panel-border) !important;
-                border-radius: 4px !important;
-                box-sizing: border-box !important;
-                background: transparent !important;
-                color: var(--ldb-panel-editor-text) !important;
-                font-family: var(--lfe-code-font, Monospace) !important;
-                font-size: 13px !important;
-                line-height: 1.5 !important;
+                height: 120px !important;
+                margin: 2px 0 0 !important;
+                padding: 9px 10px !important;
+                border: 1px solid var(--ldb-panel-border-strong) !important;
+                border-radius: 7px !important;
+                background-color: var(--ldb-panel-field-bg) !important;
+                color: var(--ldb-panel-text) !important;
+                box-shadow: none !important;
+                font-family: var(--lfe-code-font, ui-monospace, SFMono-Regular, Consolas, monospace) !important;
+                font-size: 12px !important;
+                line-height: 1.55 !important;
                 resize: none !important;
-                -webkit-appearance: none !important;
-                overflow: auto !important;
                 outline: none !important;
+                overflow: auto !important;
                 tab-size: 2 !important;
                 -moz-tab-size: 2 !important;
                 white-space: pre !important;
-                transition: border-color .2s, box-shadow .2s !important;
+                transition: border-color 0.15s, box-shadow 0.15s !important;
             }
-            #ldb-panel-customCSS::placeholder { color: var(--ldb-panel-editor-placeholder) !important; }
+            #ldb-panel-customCSS::placeholder {
+                color: var(--ldb-panel-muted) !important;
+                opacity: 0.8 !important;
+            }
             #ldb-panel-customCSS:focus {
-                border-color: var(--ldb-panel-focus) !important;
-                box-shadow: 0 0 0 2px var(--ldb-panel-focus-ring) !important;
+                border-color: var(--ldb-panel-accent) !important;
+                box-shadow: 0 0 0 3px var(--ldb-panel-accent-soft) !important;
+            }
+
+            #ldb-panel .ldb-select-row {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                gap: 10px !important;
+                margin: 8px 0 10px !important;
+            }
+            #ldb-panel .ldb-select-row > label {
+                color: var(--ldb-panel-label) !important;
+                font-size: 12.5px !important;
+                font-weight: 400 !important;
             }
             #ldb-panel-updateChannel {
-                flex: 1 !important;
+                flex: 0 0 128px !important;
+                width: 128px !important;
                 height: 32px !important;
-                padding: 0 10px !important;
-                font-size: 14px !important;
-                font-family: inherit !important;
+                margin: 0 !important;
+                padding: 0 30px 0 9px !important;
+                border: 1px solid var(--ldb-panel-border-strong) !important;
+                border-radius: 7px !important;
+                background-color: var(--ldb-panel-field-bg) !important;
+                background-image:
+                    linear-gradient(45deg, transparent 50%, var(--ldb-control-chevron, #7f8c8d) 50%),
+                    linear-gradient(135deg, var(--ldb-control-chevron, #7f8c8d) 50%, transparent 50%) !important;
+                background-position:
+                    calc(100% - 15px) calc(50% + 1px),
+                    calc(100% - 10px) calc(50% + 1px) !important;
+                background-size: 6px 6px, 6px 6px !important;
+                background-repeat: no-repeat !important;
                 color: var(--ldb-panel-text) !important;
-                background: var(--ldb-panel-field-bg) !important;
-                border: 1px solid var(--ldb-panel-border) !important;
-                border-radius: 8px !important;
-                box-sizing: border-box !important;
+                font-family: inherit !important;
+                font-size: 12.5px !important;
+                line-height: 1 !important;
+                -webkit-appearance: none !important;
+                appearance: none !important;
                 cursor: pointer !important;
                 outline: none !important;
-                transition: border-color .2s, box-shadow .2s !important;
+                box-shadow: none !important;
+                transition: border-color 0.15s, box-shadow 0.15s !important;
             }
-            #ldb-panel-updateChannel:hover { border-color: var(--ldb-panel-border-hover) !important; }
+            #ldb-panel-updateChannel:hover {
+                border-color: var(--ldb-panel-accent) !important;
+            }
             #ldb-panel-updateChannel:focus {
-                border-color: var(--ldb-panel-focus) !important;
-                box-shadow: 0 0 0 2px var(--ldb-panel-focus-ring) !important;
+                border-color: var(--ldb-panel-accent) !important;
+                box-shadow: 0 0 0 3px var(--ldb-panel-accent-soft) !important;
             }
-            #ldb-panel-checkUpdate {
-                display: inline-block !important;
+
+            #ldb-panel .ldb-actions {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 8px !important;
+                margin: 2px 0 0 !important;
+            }
+            #ldb-panel .ldb-actions button {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 6px !important;
+                height: 32px !important;
                 margin: 0 !important;
-                padding: 8px 24px !important;
-                background: var(--ldb-panel-button-bg) !important;
-                border: none !important;
-                border-radius: 30px !important;
-                font-size: 14px !important;
+                padding: 0 10px !important;
+                border: 1px solid var(--ldb-panel-btn-border) !important;
+                border-radius: 7px !important;
+                background: var(--ldb-panel-btn-bg) !important;
+                color: var(--ldb-panel-btn-text) !important;
+                font-family: inherit !important;
+                font-size: 12px !important;
                 font-weight: 500 !important;
-                color: var(--ldb-panel-button-text) !important;
+                line-height: 1 !important;
                 cursor: pointer !important;
-                box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
-                line-height: 1.4 !important;
-                box-sizing: border-box !important;
-                transition: background .2s, transform .1s !important;
+                outline: none !important;
+                box-shadow: none !important;
+                transition: background-color 0.15s, color 0.15s, border-color 0.15s !important;
             }
-            #ldb-panel-checkUpdate:hover { background: var(--ldb-panel-button-hover) !important; }
-            #ldb-panel-checkUpdate:active { transform: scale(0.96) !important; }
-            #ldb-panel-reset {
-                display: inline-block !important;
-                margin: 0 !important;
-                padding: 8px 24px !important;
-                background: var(--ldb-panel-reset-bg) !important;
-                border: none !important;
-                border-radius: 30px !important;
-                font-size: 14px !important;
-                font-weight: 500 !important;
-                color: var(--ldb-panel-reset-text) !important;
-                cursor: pointer !important;
-                box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
-                line-height: 1.4 !important;
-                box-sizing: border-box !important;
-                transition: background .2s, transform .1s !important;
+            #ldb-panel .ldb-actions button:hover {
+                background: var(--ldb-panel-btn-hover) !important;
+                color: var(--ldb-panel-heading) !important;
             }
-            #ldb-panel-reset:hover { background: var(--ldb-panel-reset-hover) !important; }
-            #ldb-panel-reset:active { transform: scale(0.96) !important; }
+            #ldb-panel .ldb-actions button:active { transform: none !important; }
+            #ldb-panel .ldb-actions button:focus-visible {
+                outline: 2px solid var(--ldb-panel-accent) !important;
+                outline-offset: 1px !important;
+            }
+            #ldb-panel .ldb-actions button .ldb-icon {
+                width: 14px !important;
+                height: 14px !important;
+            }
+            #ldb-panel #ldb-panel-checkUpdate {
+                background: var(--ldb-panel-accent) !important;
+                border-color: var(--ldb-panel-accent) !important;
+                color: #fff !important;
+            }
+            #ldb-panel #ldb-panel-checkUpdate:hover {
+                background: var(--ldb-panel-accent-hover) !important;
+                border-color: var(--ldb-panel-accent-hover) !important;
+                color: #fff !important;
+            }
+
             #ldb-panel #ldb-updateStatus {
                 display: block !important;
-                margin: 4px 0 0 0 !important;
+                margin: 8px 0 0 !important;
                 padding: 0 !important;
-                font-size: 12px !important;
-                line-height: 1.4 !important;
-                color: var(--ldb-panel-status) !important;
+                color: var(--ldb-panel-muted) !important;
+                font-size: 11.5px !important;
+                line-height: 1.5 !important;
                 text-align: left !important;
                 word-break: break-all !important;
             }
-            #ldb-panel #ldb-updateStatus:empty { display: none !important; margin: 0 !important; }
-            #blur-value, #opacity-value, #topbar-opacity-value, #sidebar-opacity-value,
-            #rounded-value-card, #rounded-value-pic {
-                display: inline-block !important;
-                width: 45px !important;
-                text-align: center !important;
-                font-weight: 500 !important;
-                line-height: 1 !important;
+            #ldb-panel #ldb-updateStatus:empty {
+                display: none !important;
+                margin: 0 !important;
             }
-            #ldb-panel a { color: var(--ldb-panel-link) !important; text-decoration: none !important; }
+
+            #ldb-panel a {
+                color: var(--ldb-panel-accent) !important;
+                text-decoration: none !important;
+            }
             #ldb-panel a:hover { text-decoration: underline !important; }
-            @media (max-width: 900px) {
-                #ldb-panel { width: 50vw !important; right: 12px !important; }
+
+            @media (max-width: 520px) {
+                #ldb-panel {
+                    right: 12px !important;
+                    width: calc(100vw - 24px) !important;
+                    max-height: 86vh !important;
+                }
             }
-            @media (max-width: 400px) {
-                #ldb-panel { width: calc(100vw - 20px) !important; right: 10px !important;
-                             padding: 20px 16px !important; }
+
+            @media (prefers-reduced-motion: reduce) {
+                #ldb-panel,
+                #ldb-panel .ldb-switch,
+                #ldb-panel .ldb-switch::after,
+                #ldb-panel-customCSS {
+                    transition: none !important;
+                }
             }`;
         document.head.appendChild(style);
     }
@@ -1563,7 +2000,8 @@
         const bv = blurValue != null && !isNaN(blurValue) ? blurValue : 10;
         const ov = opacityValue != null && !isNaN(opacityValue) ? opacityValue : 75;
         panelElement.style.setProperty('--ldb-panel-blur', `blur(${bv}px)`);
-        panelElement.style.setProperty('--ldb-panel-opacity', String(ov / 100));
+        // Keep the settings panel readable even when cards are made very transparent.
+        panelElement.style.setProperty('--ldb-panel-opacity', String(Math.min(1, Math.max(0.96, ov / 100))));
     }
 
     function toggleSettingsPanel() {
@@ -1737,7 +2175,7 @@
                     const remoteVersion = match[1];
                     if (compareVersions(remoteVersion, localVersion) > 0) {
                         statusEl.innerHTML = '发现新版本 v' + remoteVersion + '，' +
-                            '<a href="' + rawUrl + '" target="_blank" style="color:#0d6efd;text-decoration:underline;cursor:pointer;">点击安装</a>';
+                            '<a href="' + rawUrl + '" target="_blank" rel="noopener" class="ldb-update-link">点击安装</a>';
                     } else {
                         statusEl.textContent = '已是最新版本 v' + localVersion;
                         statusEl._ldbTimer = setTimeout(() => {
@@ -1778,6 +2216,7 @@
         applyFullscreenBackground();
         applyFullscreenEditorLayout();
         applyAdBlock();
+        applyControlStyles();
         applyCustomCSS();
         applyIdeLayout();
         applyScrollbarStyle();

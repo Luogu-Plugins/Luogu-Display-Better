@@ -45,6 +45,7 @@ Luogu Display Better is a lightweight user script for [Luogu](https://www.luogu.
 - **Ad Blocker**: Hide sidebar ad cards to reduce visual noise.
 - **Custom CSS**: Inject custom CSS directly to quickly personalize the interface.
 - **Update Channel**: Switch between the stable and latest update channels and check for updates right from the settings panel.
+- **Refined Controls**: Theme-aware inputs, textareas, selects, dropdown menus, checkboxes, and buttons for a consistent look.
 
 ## Installation
 
@@ -61,7 +62,7 @@ Luogu Display Better is a lightweight user script for [Luogu](https://www.luogu.
 - Custom CSS entered in the panel is injected into the page instantly.
 - Settings are stored locally and stay in sync across all open Luogu tabs, and the panel controls refresh automatically.
 - The panel also provides an update channel selector, a check-for-updates button, and a reset button to restore default settings.
-- Press <kbd>Esc</kbd> or click the red close button in the top-right corner to close the settings panel.
+- Press <kbd>Esc</kbd> or click the close button in the top-right corner to close the settings panel.
 
 ## Contributing & Feedback
 
